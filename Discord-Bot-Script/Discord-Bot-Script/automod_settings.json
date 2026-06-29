@@ -1,0 +1,14 @@
+{
+  "word_filter": {
+    "enabled": false,
+    "words": []
+  },
+  "anti_spam": {
+    "enabled": false,
+    "max_messages": 5,
+    "window_seconds": 5
+  },
+  "anti_link": {
+    "enabled": false
+  }
+}
