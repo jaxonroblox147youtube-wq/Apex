@@ -321,6 +321,12 @@ async def on_ready():
         activity=discord.Activity(type=discord.ActivityType.watching, name="over the server 👀")
     )
     print(f"Logged in as {bot.user.name}")
+    try:
+        print("Starting slash command sync...")
+        synced = await bot.tree.sync()
+        print(f"Success! Synced {len(synced)} slash commands globally.")
+    except Exception as e:
+        print(f"Failed to sync slash commands: {e}")
     write_stats.start()
     check_youtube.start()
 
