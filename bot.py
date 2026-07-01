@@ -8,9 +8,14 @@ bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+    try:
+        print("Starting command sync...")
+        # Syncing globally takes a few minutes to update across Discord
+        synced = await bot.tree.sync() 
+        print(f"Success! Synced {len(synced)} slash commands globally.")
+    except Exception as e:
+        print(f"Failed to sync commands: {e}")
 
-# Start the web server first
-keep_alive()
 
 # Start the bot using your GitHub secret / environment variable
 bot.run(os.environ.get("DISCORD_TOKEN"))
@@ -35,12 +40,3 @@ try:
 except Exception as e:
     print(f"CRITICAL ERROR: Discord bot crashed on startup! Details: {e}")
     sys.exit(1)
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
-    try:
-        # This forces Discord to update and recognize your commands
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
-    except Exception as e:
-        print(f"Failed to sync commands: {e}")
