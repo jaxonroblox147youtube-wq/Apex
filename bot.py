@@ -1,7 +1,8 @@
 import os
+import sys
 import discord
 from discord.ext import commands
-from keep_alive import keep_alive  # Import your web server
+from keep_alive import keep_alive
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
@@ -9,17 +10,11 @@ bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 async def on_ready():
     print(f"Logged in as {bot.user}")
     try:
-        print("Starting command sync...")
-        # Syncing globally takes a few minutes to update across Discord
-        synced = await bot.tree.sync() 
+        print("Starting slash command sync...")
+        synced = await bot.tree.sync()
         print(f"Success! Synced {len(synced)} slash commands globally.")
     except Exception as e:
-        print(f"Failed to sync commands: {e}")
-
-
-# Start the bot using your GitHub secret / environment variable
-bot.run(os.environ.get("DISCORD_TOKEN"))
-import sys
+        print(f"Failed to sync slash commands: {e}")
 
 # Start the web server first
 try:
