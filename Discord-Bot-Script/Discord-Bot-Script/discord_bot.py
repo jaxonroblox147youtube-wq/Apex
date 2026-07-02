@@ -1720,6 +1720,7 @@ async def battle(interaction: discord.Interaction, opponent: discord.Member):
 ROBLOX_CLIENT_ID     = os.getenv("ROBLOX_CLIENT_ID",     "YOUR_ROBLOX_CLIENT_ID_HERE")
 ROBLOX_CLIENT_SECRET = os.getenv("ROBLOX_CLIENT_SECRET", "YOUR_ROBLOX_CLIENT_SECRET_HERE")
 ROBLOX_GROUP_ID      = os.getenv("ROBLOX_GROUP_ID",      "YOUR_ROBLOX_GROUP_ID_HERE")
+SESSION_SECRET       = os.getenv("SESSION_SECRET", "")
 ROBLOX_TOKENS_FILE   = "roblox_tokens.json"
 
 # Callback URL must be registered in your Roblox OAuth app settings.
@@ -1832,7 +1833,9 @@ async def roblox_link(interaction: discord.Interaction):
         )
         return
     import urllib.parse
-    state   = str(interaction.user.id)
+    state = str(interaction.user.id)
+    if SESSION_SECRET:
+        state = f"{interaction.user.id}:{SESSION_SECRET}"
     scopes  = "openid profile"
     params = urllib.parse.urlencode(
         [
