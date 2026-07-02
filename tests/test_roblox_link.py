@@ -22,6 +22,9 @@ class RobloxLinkStorageTests(unittest.TestCase):
             self.assertEqual(data.get("access_token"), "abc123")
             self.assertEqual(data.get("refresh_token"), "xyz789")
 
+    def test_uses_absolute_path_for_storage_file(self):
+        self.assertTrue(os.path.isabs(bot.ROBLOX_LINKS_FILE))
+
 
 if __name__ == "__main__":
     unittest.main()

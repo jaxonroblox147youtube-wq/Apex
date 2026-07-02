@@ -49,7 +49,7 @@ class MyBot(commands.Bot):
 bot = MyBot()
 
 app = Flask(__name__)
-ROBLOX_LINKS_FILE = "roblox_links.json"
+ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
 
 
 def _load_roblox_links() -> dict:
@@ -63,6 +63,7 @@ def _load_roblox_links() -> dict:
 
 
 def _save_roblox_links(data: dict) -> None:
+    os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
     with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
