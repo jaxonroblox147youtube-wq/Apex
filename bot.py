@@ -2781,4 +2781,5 @@ token = os.environ.get("DISCORD_TOKEN")
 if not token:
     raise ValueError("DISCORD_TOKEN is not set. Add it to your secrets.")
 
-bot.run(token)
+if __name__ == "__main__":
+    bot.run(token)
