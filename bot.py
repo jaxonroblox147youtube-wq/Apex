@@ -1836,14 +1836,18 @@ async def roblox_link(interaction: discord.Interaction):
     import urllib.parse
     state   = str(interaction.user.id)
     scopes  = "openid profile"
-    params  = urllib.parse.urlencode({
-        "client_id":     ROBLOX_CLIENT_ID,
-        "redirect_uri":  ROBLOX_REDIRECT_URI,
-        "scope":         scopes,
-        "response_type": "code",
-        "state":         state,
-        "prompt":        "select_account consent",
-    })
+    params  = urllib.parse.urlencode(
+        [
+            ("client_id", ROBLOX_CLIENT_ID),
+            ("redirect_uri", ROBLOX_REDIRECT_URI),
+            ("scope", scopes),
+            ("response_type", "code"),
+            ("state", state),
+            ("prompt", "select_account"),
+            ("prompt", "consent"),
+        ],
+        doseq=True,
+    )
     auth_url = f"https://apis.roblox.com/oauth/v1/authorize?{params}"
     embed = discord.Embed(
         title="🔗 Link Your Roblox Account",
