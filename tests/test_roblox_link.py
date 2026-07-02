@@ -25,6 +25,22 @@ class RobloxLinkStorageTests(unittest.TestCase):
     def test_uses_absolute_path_for_storage_file(self):
         self.assertTrue(os.path.isabs(bot.ROBLOX_LINKS_FILE))
 
+    def test_resolves_redirect_uri_from_replit_url(self):
+        original = os.environ.get("ROBLOX_REDIRECT_URI")
+        os.environ.pop("ROBLOX_REDIRECT_URI", None)
+        os.environ["REPLIT_URL"] = "https://example.repl.co/"
+        try:
+            self.assertEqual(
+                bot._get_roblox_redirect_uri(),
+                "https://example.repl.co/api/roblox/callback",
+            )
+        finally:
+            if original is None:
+                os.environ.pop("ROBLOX_REDIRECT_URI", None)
+            else:
+                os.environ["ROBLOX_REDIRECT_URI"] = original
+            os.environ.pop("REPLIT_URL", None)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -56,6 +56,24 @@ app = Flask(__name__)
 ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
 
 
+def _get_roblox_redirect_uri() -> str:
+    configured = os.getenv("ROBLOX_REDIRECT_URI", "").strip()
+    if configured:
+        return configured
+
+    for env_name in ("REPLIT_URL", "PUBLIC_URL", "APP_URL", "URL"):
+        value = os.getenv(env_name, "").strip()
+        if value:
+            return value.rstrip("/") + "/api/roblox/callback"
+
+    for env_name in ("REPL_SLUG",):
+        value = os.getenv(env_name, "").strip()
+        if value:
+            return f"https://{value}.replit.app/api/roblox/callback"
+
+    return "http://localhost:10000/api/roblox/callback"
+
+
 def _load_roblox_links() -> dict:
     if not os.path.exists(ROBLOX_LINKS_FILE):
         return {}
@@ -1724,11 +1742,8 @@ SESSION_SECRET       = os.getenv("SESSION_SECRET", "")
 ROBLOX_TOKENS_FILE   = "roblox_tokens.json"
 
 # Callback URL must be registered in your Roblox OAuth app settings.
-# Set this to your deployed API server URL + /api/roblox/callback
-ROBLOX_REDIRECT_URI  = os.getenv(
-    "ROBLOX_REDIRECT_URI",
-    "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback"
-)
+# Prefer the live deploy URL from the environment; if absent, derive it from Replit/public URL.
+ROBLOX_REDIRECT_URI = _get_roblox_redirect_uri()
 
 async def _roblox_get(session: aiohttp.ClientSession, url: str, token: str | None = None) -> dict:
     headers = {"Accept": "application/json"}
