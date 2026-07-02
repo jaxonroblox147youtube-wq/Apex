@@ -115,7 +115,8 @@ def roblox_callback():
     if not code or not state:
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
     try:
-        discord_id = int(state)
+        discord_id_raw = state.split(":", 1)[0]
+        discord_id = int(discord_id_raw)
     except ValueError:
         return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
 
