@@ -1843,8 +1843,7 @@ async def roblox_link(interaction: discord.Interaction):
             ("scope", scopes),
             ("response_type", "code"),
             ("state", state),
-            ("prompt", "select_account"),
-            ("prompt", "consent"),
+            ("prompt", "select_account consent"),
         ],
         doseq=True,
     )
