@@ -8,9 +8,12 @@ import asyncio
 from threading import Thread
 import aiohttp
 import discord
+from dotenv import load_dotenv
 from discord import app_commands
 from discord.ext import commands, tasks
 from flask import Flask, request
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 # ── Data files ────────────────────────────────────────────────────────────────
 WELCOME_FILE   = "welcome_channels.json"
