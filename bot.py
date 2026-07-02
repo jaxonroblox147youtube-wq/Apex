@@ -1727,7 +1727,7 @@ ROBLOX_TOKENS_FILE   = "roblox_tokens.json"
 # The default points at the local callback endpoint started by this bot.
 ROBLOX_REDIRECT_URI  = os.getenv(
     "ROBLOX_REDIRECT_URI",
-    "http://localhost:10000/api/roblox/callback"
+    "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback"
 )
 
 async def _roblox_get(session: aiohttp.ClientSession, url: str, token: str | None = None) -> dict:
