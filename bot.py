@@ -5,10 +5,12 @@ import re
 import xml.etree.ElementTree as ET
 import datetime
 import asyncio
+from threading import Thread
 import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+from flask import Flask, request
 
 # ── Data files ────────────────────────────────────────────────────────────────
 WELCOME_FILE   = "welcome_channels.json"
@@ -45,6 +47,87 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
 bot = MyBot()
+
+app = Flask(__name__)
+ROBLOX_LINKS_FILE = "roblox_links.json"
+
+
+def _load_roblox_links() -> dict:
+    if not os.path.exists(ROBLOX_LINKS_FILE):
+        return {}
+    try:
+        with open(ROBLOX_LINKS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_roblox_links(data: dict) -> None:
+    with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def _store_roblox_link(discord_id: int, token_data: dict) -> None:
+    links = _load_roblox_links()
+    links[str(discord_id)] = token_data
+    _save_roblox_links(links)
+
+
+def _load_roblox_link(discord_id: int) -> dict | None:
+    links = _load_roblox_links()
+    return links.get(str(discord_id))
+
+
+async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
+    if ROBLOX_CLIENT_ID.startswith("YOUR_") or ROBLOX_CLIENT_SECRET.startswith("YOUR_"):
+        return {}
+    payload = {
+        "client_id": ROBLOX_CLIENT_ID,
+        "client_secret": ROBLOX_CLIENT_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": redirect_uri,
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://apis.roblox.com/oauth/v1/token",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as r:
+            try:
+                return await r.json()
+            except Exception:
+                return {}
+
+
+@app.route("/api/roblox/callback")
+def roblox_callback():
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+    if error:
+        return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
+    if not code or not state:
+        return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
+    try:
+        discord_id = int(state)
+    except ValueError:
+        return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
+
+    token_data = asyncio.run(_exchange_roblox_code(code, ROBLOX_REDIRECT_URI))
+    if not token_data.get("access_token"):
+        return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
+
+    _store_roblox_link(discord_id, token_data)
+    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
+
+
+def _start_flask_server() -> None:
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+
+Thread(target=_start_flask_server, daemon=True).start()
 
 @tasks.loop(seconds=30)
 async def write_stats():
@@ -1641,10 +1724,10 @@ ROBLOX_GROUP_ID      = os.getenv("ROBLOX_GROUP_ID",      "YOUR_ROBLOX_GROUP_ID_H
 ROBLOX_TOKENS_FILE   = "roblox_tokens.json"
 
 # Callback URL must be registered in your Roblox OAuth app settings.
-# Set this to your deployed API server URL + /api/roblox/callback
+# The default points at the local callback endpoint started by this bot.
 ROBLOX_REDIRECT_URI  = os.getenv(
     "ROBLOX_REDIRECT_URI",
-    "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback"
+    "http://localhost:10000/api/roblox/callback"
 )
 
 async def _roblox_get(session: aiohttp.ClientSession, url: str, token: str | None = None) -> dict:
@@ -1669,17 +1752,10 @@ async def _roblox_post(session: aiohttp.ClientSession, url: str, json_body: dict
 API_BASE = "http://localhost:8080/api"   # internal – same container as the bot
 
 async def _load_roblox_token(discord_id: int) -> str | None:
-    """Fetch the stored Roblox access token for a Discord user from the API server."""
+    """Fetch the stored Roblox access token for a Discord user from the local link file."""
     try:
-        async with aiohttp.ClientSession() as s:
-            async with s.get(
-                f"{API_BASE}/roblox/linked/{discord_id}",
-                timeout=aiohttp.ClientTimeout(total=5),
-            ) as r:
-                if r.status != 200:
-                    return None
-                data = await r.json()
-                return data.get("access_token") if data.get("linked") else None
+        data = _load_roblox_link(discord_id)
+        return data.get("access_token") if data else None
     except Exception:
         return None
 
@@ -1750,9 +1826,9 @@ async def roblox_lookup(interaction: discord.Interaction, username: str):
 # ── /robloxlink — start OAuth flow ────────────────────────────────────────────
 @bot.tree.command(name="robloxlink", description="Link your Roblox account to this bot via Roblox OAuth")
 async def roblox_link(interaction: discord.Interaction):
-    if ROBLOX_CLIENT_ID.startswith("YOUR_"):
+    if ROBLOX_CLIENT_ID.startswith("YOUR_") or ROBLOX_CLIENT_SECRET.startswith("YOUR_"):
         await interaction.response.send_message(
-            "⚙️ Roblox OAuth is not configured yet. Ask the bot owner to set up `ROBLOX_CLIENT_ID`.",
+            "⚙️ Roblox OAuth is not configured yet. Ask the bot owner to set up `ROBLOX_CLIENT_ID` and `ROBLOX_CLIENT_SECRET`.",
             ephemeral=True,
         )
         return
@@ -1765,14 +1841,15 @@ async def roblox_link(interaction: discord.Interaction):
         "scope":         scopes,
         "response_type": "code",
         "state":         state,
+        "prompt":        "consent",
     })
     auth_url = f"https://apis.roblox.com/oauth/v1/authorize?{params}"
     embed = discord.Embed(
         title="🔗 Link Your Roblox Account",
         description=(
-            f"Click the button below to authorize the bot to access your Roblox account.\n\n"
+            f"Open the link below, approve the request, and return to Discord.\n\n"
             f"[**Authorize on Roblox →**]({auth_url})\n\n"
-            f"Once you approve, your account will be linked and you can use `/robloxme`, "
+            f"Once you approve, the bot will store the token locally and you can use `/robloxme`, "
             f"`/robloxannounce`, and `/robloxrole`."
         ),
         color=discord.Color.from_rgb(226, 35, 26),
