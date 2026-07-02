@@ -2,6 +2,8 @@ import os
 import tempfile
 import unittest
 
+os.environ.setdefault("DISCORD_TOKEN", "dummy")
+
 import bot
 
 
