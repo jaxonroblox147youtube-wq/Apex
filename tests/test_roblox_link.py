@@ -3,6 +3,7 @@ import tempfile
 import unittest
 
 os.environ.setdefault("DISCORD_TOKEN", "dummy")
+os.environ.setdefault("BOT_TEST_MODE", "1")
 
 import bot
 

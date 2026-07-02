@@ -150,7 +150,8 @@ def _start_flask_server() -> None:
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
 
-Thread(target=_start_flask_server, daemon=True).start()
+if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
+    Thread(target=_start_flask_server, daemon=True).start()
 
 @tasks.loop(seconds=30)
 async def write_stats():
@@ -2833,4 +2834,7 @@ token = os.environ.get("DISCORD_TOKEN")
 if not token:
     raise ValueError("DISCORD_TOKEN is not set. Add it to your secrets.")
 
-bot.run(token)
+if os.environ.get("BOT_TEST_MODE", "").lower() in {"1", "true", "yes", "on"}:
+    print("Skipping Discord login in test mode.")
+else:
+    bot.run(token)
