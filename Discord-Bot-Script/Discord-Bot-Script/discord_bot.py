@@ -1839,7 +1839,7 @@ async def roblox_link(interaction: discord.Interaction):
         "scope":         scopes,
         "response_type": "code",
         "state":         state,
-        "prompt":        "consent",
+        "prompt":        "select_account consent",
     })
     auth_url = f"https://apis.roblox.com/oauth/v1/authorize?{params}"
     embed = discord.Embed(
