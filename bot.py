@@ -1919,7 +1919,7 @@ async def roblox_announce(interaction: discord.Interaction, message: str):
     await interaction.response.defer(ephemeral=True)
     token = await _load_roblox_token(interaction.user.id)
     if not token:
-        await interaction.followup.send("❌ Link your Roblox account first with `/robloxlink`.", ephemeral=True)
+        await interaction.followup.send("❌ Link your Roblox poopoop account first with `/robloxlink`.", ephemeral=True)
         return
     if ROBLOX_GROUP_ID.startswith("YOUR_"):
         await interaction.followup.send("⚙️ `ROBLOX_GROUP_ID` is not configured yet.", ephemeral=True)
