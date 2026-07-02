@@ -2793,5 +2793,3 @@ if not token:
     raise ValueError("DISCORD_TOKEN is not set. Add it to your secrets.")
 :
     bot.run(token)
- await bot.change_presence(
-                    status=discord.Status.Sleep,
