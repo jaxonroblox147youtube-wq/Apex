@@ -2791,5 +2791,4 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 token = os.environ.get("DISCORD_TOKEN")
 if not token:
     raise ValueError("DISCORD_TOKEN is not set. Add it to your secrets.")
-:
     bot.run(token)
