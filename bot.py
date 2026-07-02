@@ -1765,11 +1765,37 @@ async def _load_roblox_token(discord_id: int) -> str | None:
     except Exception:
         return None
 
+async def _ack_interaction(interaction: discord.Interaction, *, ephemeral: bool = False) -> None:
+    if interaction.response.is_done():
+        return
+    try:
+        await interaction.response.defer(ephemeral=ephemeral)
+    except Exception:
+        pass
+
+async def _reply_interaction(
+    interaction: discord.Interaction,
+    content: str | None = None,
+    *,
+    embed: discord.Embed | None = None,
+    ephemeral: bool = False,
+) -> None:
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+        else:
+            await interaction.response.send_message(content=content, embed=embed, ephemeral=ephemeral)
+    except Exception:
+        try:
+            await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+        except Exception:
+            pass
+
 # ── /roblox <username> — public profile lookup ────────────────────────────────
 @bot.tree.command(name="roblox", description="Look up a Roblox user's profile and avatar")
 @app_commands.describe(username="Roblox username to search")
 async def roblox_lookup(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         # 1. Resolve username → user ID via POST endpoint
         async with session.post(
@@ -1871,7 +1897,7 @@ async def roblox_link(interaction: discord.Interaction):
 # ── /robloxunlink — remove linked Roblox account ─────────────────────────────
 @bot.tree.command(name="robloxunlink", description="Unlink your Roblox account from this bot")
 async def roblox_unlink(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
+    await _ack_interaction(interaction, ephemeral=True)
     try:
         async with aiohttp.ClientSession() as s:
             async with s.delete(
@@ -1889,7 +1915,7 @@ async def roblox_unlink(interaction: discord.Interaction):
 # ── /robloxme — show your linked profile ─────────────────────────────────────
 @bot.tree.command(name="robloxme", description="Show your linked Roblox profile")
 async def roblox_me(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
+    await _ack_interaction(interaction, ephemeral=True)
     token = await _load_roblox_token(interaction.user.id)
     if not token:
         await interaction.followup.send(
@@ -1922,7 +1948,7 @@ async def roblox_me(interaction: discord.Interaction):
 @app_commands.describe(message="The announcement message to post")
 @app_commands.check(is_owner)
 async def roblox_announce(interaction: discord.Interaction, message: str):
-    await interaction.response.defer(ephemeral=True)
+    await _ack_interaction(interaction, ephemeral=True)
     token = await _load_roblox_token(interaction.user.id)
     if not token:
         await interaction.followup.send("❌ Link your Roblox account first with `/robloxlink`.", ephemeral=True)
@@ -1950,7 +1976,7 @@ async def roblox_announce(interaction: discord.Interaction, message: str):
 @app_commands.describe(username="Roblox username of the target user", rolename="Exact name of the group role to assign")
 @app_commands.check(is_owner)
 async def roblox_role(interaction: discord.Interaction, username: str, rolename: str):
-    await interaction.response.defer(ephemeral=True)
+    await _ack_interaction(interaction, ephemeral=True)
     token = await _load_roblox_token(interaction.user.id)
     if not token:
         await interaction.followup.send("❌ Link your Roblox account first with `/robloxlink`.", ephemeral=True)
@@ -2009,7 +2035,7 @@ async def roblox_role(interaction: discord.Interaction, username: str, rolename:
 # ── /robloxroles — list all roles in the group ───────────────────────────────
 @bot.tree.command(name="robloxroles", description="List all roles in your configured Roblox group")
 async def roblox_roles(interaction: discord.Interaction):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     if ROBLOX_GROUP_ID.startswith("YOUR_"):
         await interaction.followup.send("⚙️ `ROBLOX_GROUP_ID` is not configured yet.", ephemeral=True)
         return
@@ -2039,7 +2065,7 @@ async def roblox_roles(interaction: discord.Interaction):
 @bot.tree.command(name="robloxgame", description="Search for a Roblox game and show its info")
 @app_commands.describe(name="Name of the Roblox game to search for")
 async def roblox_game(interaction: discord.Interaction, name: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         # 1. Search for games
         search_url = (
@@ -2118,7 +2144,7 @@ async def roblox_game(interaction: discord.Interaction, name: str):
 # ── /robloxstatus — live Roblox service health ────────────────────────────────
 @bot.tree.command(name="robloxstatus", description="Check Roblox's live service status")
 async def roblox_status(interaction: discord.Interaction):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.get(
             "https://status.roblox.com/api/v2/summary.json",
@@ -2160,7 +2186,7 @@ async def roblox_status(interaction: discord.Interaction):
 @bot.tree.command(name="robloxavatar", description="Show a Roblox user's full body avatar")
 @app_commands.describe(username="Roblox username")
 async def roblox_avatar(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
@@ -2217,7 +2243,7 @@ async def roblox_avatar(interaction: discord.Interaction, username: str):
 @bot.tree.command(name="robloxbadges", description="Show a Roblox user's recently earned badges")
 @app_commands.describe(username="Roblox username")
 async def roblox_badges(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
@@ -2260,7 +2286,7 @@ async def roblox_badges(interaction: discord.Interaction, username: str):
 @bot.tree.command(name="robloxfriends", description="Show a Roblox user's friends")
 @app_commands.describe(username="Roblox username")
 async def roblox_friends(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
@@ -2306,7 +2332,7 @@ async def roblox_friends(interaction: discord.Interaction, username: str):
 @bot.tree.command(name="robloxgroup", description="Look up a Roblox group by name")
 @app_commands.describe(name="Group name to search")
 async def roblox_group_lookup(interaction: discord.Interaction, name: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.get(
             f"https://groups.roblox.com/v1/groups/search?keyword={name.replace(' ', '+')}&prioritizeExactMatch=true&limit=10",
@@ -2363,7 +2389,7 @@ async def roblox_group_lookup(interaction: discord.Interaction, name: str):
 @bot.tree.command(name="robloxpresence", description="Check what a Roblox user is currently doing")
 @app_commands.describe(username="Roblox username")
 async def roblox_presence(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
@@ -2433,7 +2459,7 @@ async def roblox_presence(interaction: discord.Interaction, username: str):
 @bot.tree.command(name="robloxitem", description="Search the Roblox catalog for an item")
 @app_commands.describe(name="Item name to search")
 async def roblox_item(interaction: discord.Interaction, name: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.get(
             f"https://catalog.roblox.com/v1/search/items?category=All&keyword={name.replace(' ', '+')}&limit=10&salesTypeFilter=1",
@@ -2498,7 +2524,7 @@ async def roblox_item(interaction: discord.Interaction, name: str):
 @bot.tree.command(name="robloxgroups", description="List the Roblox groups a user is in")
 @app_commands.describe(username="Roblox username")
 async def roblox_user_groups(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
@@ -2546,7 +2572,7 @@ async def roblox_user_groups(interaction: discord.Interaction, username: str):
 @bot.tree.command(name="robloxrap", description="Show a Roblox user's limited items and total RAP")
 @app_commands.describe(username="Roblox username")
 async def roblox_rap(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
@@ -2599,7 +2625,7 @@ async def roblox_rap(interaction: discord.Interaction, username: str):
 @bot.tree.command(name="robloxserver", description="Show active servers for a Roblox game")
 @app_commands.describe(game="Roblox game name to search")
 async def roblox_server(interaction: discord.Interaction, game: str):
-    await interaction.response.defer()
+    await _ack_interaction(interaction)
     async with aiohttp.ClientSession() as session:
         # Search for the game first
         async with session.get(
@@ -2780,9 +2806,9 @@ async def on_command_error(ctx, error):
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.CheckFailure):
-        await interaction.response.send_message("❌ Only the server owner can use this command.", ephemeral=True)
-    elif not interaction.response.is_done():
-        await interaction.response.send_message(f"❌ An error occurred: {error}", ephemeral=True)
+        await _reply_interaction(interaction, "❌ Only the server owner can use this command.", ephemeral=True)
+    else:
+        await _reply_interaction(interaction, f"❌ An error occurred: {error}", ephemeral=True)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # RUN
