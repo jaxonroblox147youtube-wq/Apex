@@ -136,9 +136,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
             except Exception:
                 return {}
 
-@bot.event
-
-
 def _save_roblox_links(data: dict) -> None:
     os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
     with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
