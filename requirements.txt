@@ -2,3 +2,4 @@ discord.py
 quart
 hypercorn
 aiohttp
+Discord Token{MTUwNzc3NjUyNDE4OTgyNzI0Mg.G0vDNZ.LwUf96PLaUjVS478OGe1n-jbTCWiPz9uQ32zkc}

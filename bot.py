@@ -82,7 +82,6 @@ async def roblox_callback():
     except Exception as e:
         print(f"❌ Error exchanging code: {e}")
         token_data = {}
-Discord Token For Apex:MTUwNzc3NjUyNDE4OTgyNzI0Mg.G0vDNZ.LwUf96PLaUjVS478OGe1n-jbTCWiPz9uQ32zkc
     if not token_data or not token_data.get("access_token"):
         return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
 
