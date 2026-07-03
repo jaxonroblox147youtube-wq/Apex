@@ -149,45 +149,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
             except Exception:
                 return {}
 
-@app.route("/api/roblox/callback")
-async def roblox_callback(): # Changed to async
-    code = request.args.get("code")
-    state = request.args.get("state")
-    error = request.args.get("error")
-
-    if error:
-        return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
-    if not code or not state:
-        return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
-
-    try:
-        # FIXED: Corrected unpacking. Previously assigned a full list directly to an int.
-        discord_id_raw = state.split(":", 1)[0]
-        discord_id = int(discord_id_raw)
-    except (ValueError, IndexError):
-        return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
-
-    real_redirect = "https://replit.app"
-    try:
-        # FIXED: Quart runs directly on the async loop, no need to create hacky secondary loops!
-        token_data = await _exchange_roblox_code(code, real_redirect)
-    except Exception as e:
-        print(f"❌ Error exchanging code: {e}")
-        token_data = {}
-
-    if not token_data or not token_data.get("access_token"):
-        return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
-
-    _store_roblox_link(discord_id, token_data)
-    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
-
-# ==========================================
-# DISCORD BOT INITIALIZATION
-# ==========================================
-intents = discord.Intents.default()
-intents.message_content = True  
-bot = commands.Bot(command_prefix="!", intents=intents)
-
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
