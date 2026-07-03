@@ -240,18 +240,6 @@ async def on_ready():
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
     print("🤖 Discord bot is alive and operational!")
 
-# 3. Main script entrypoint execution loop
-if __name__ == "__main__":
-    # Fetch token from Railway environment variables dashboard
-    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-
-    if not DISCORD_TOKEN:
-        print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
-    else:
-        # This blocks the primary main thread from closing, keeping Railway running continuously
-        bot.run(DISCORD_TOKEN)
-
-        return {}
 
 def _save_roblox_links(data: dict) -> None:
     os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
