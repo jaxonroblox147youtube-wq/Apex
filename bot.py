@@ -54,6 +54,8 @@ import asyncio
 import aiohttp
 from threading import Thread
 from flask import Flask, request
+import discord # Make sure to add discord.py to your requirements.txt
+from discord.ext import commands
 
 app = Flask(__name__)
 
@@ -156,13 +158,37 @@ def _start_flask_server() -> None:
     # Railway automatically binds and injects the proper internal PORT variable to expose your service
     port = int(os.environ.get("PORT", 8080))
     print(f"📡 Web engine launching on Railway container port: {port}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
+# ==========================================
+# DISCORD BOT STARTUP & RAILWAY BINDING
+# ==========================================
+
+# 1. Start the web server thread so Railway sees an active port immediately
 if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
     Thread(target=_start_flask_server, daemon=True).start()
 
-            return json.load(f)
-    except Exception:
+# 2. Initialize your actual Discord Bot
+intents = discord.Intents.default()
+intents.message_content = True  # Enable this if your bot reads message content
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.name} ({bot.user.id})")
+    print("🤖 Discord bot is alive and operational!")
+
+# 3. Main script entrypoint execution loop
+if __name__ == "__main__":
+    # Fetch token from Railway environment variables dashboard
+    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+    
+    if not DISCORD_TOKEN:
+        print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
+    else:
+        # This blocks the primary main thread from closing, keeping Railway running continuously
+        bot.run(DISCORD_TOKEN)
+
         return {}
 
 def _save_roblox_links(data: dict) -> None:
