@@ -552,7 +552,7 @@ if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}
     Thread(target=_start_flask_server, daemon=True).start()
 (datetime.datetime.utcnow() - BOT_START_TIME).total_seconds() if BOT_START_TIME else 0,
 
-    "command_count": 61,
+        "command_count": 61,
         "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
     }
     save_json(STATS_FILE, stats)
