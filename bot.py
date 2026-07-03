@@ -1,68 +1,16 @@
 import os
 import json
-import random
-import re
-import xml.etree.ElementTree as ET
-import datetime
-import asyncio
-from threading import Thread
-import aiohttp
-import discord
-from dotenv import load_dotenv
-from discord import app_commands
-from discord.ext import commands, tasks
-from flask import Flask, request
-
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-
-# ── Data files ────────────────────────────────────────────────────────────────
-WELCOME_FILE   = "welcome_channels.json"
-WARNINGS_FILE  = "warnings.json"
-WARN_ROLES_FILE= "warn_roles.json"
-STATS_FILE        = "bot_stats.json"
-CUSTOM_CMDS_FILE  = "custom_commands.json"
-AUTOMOD_FILE      = "automod_settings.json"
-
-BOT_START_TIME = None
-
-# Spam tracking: {guild_id: {user_id: [timestamps]}}
-spam_tracker: dict = {}
-
-def load_json(path):
-    if os.path.exists(path):
-        with open(path, "r") as f:
-            return json.load(f)
-    return {}
-
-def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f)
-
-welcome_channels = load_json(WELCOME_FILE)
-warnings_data    = load_json(WARNINGS_FILE)
-warn_roles       = load_json(WARN_ROLES_FILE)
-
-# ── Bot setup ─────────────────────────────────────────────────────────────────
-intents = discord.Intents.all()
-
-class MyBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
-import os
-import json
 import asyncio
 import aiohttp
-from quart import Quart, request # Replaced Flask with Quart
+from quart import Quart, request
 import discord
 from discord.ext import commands
+from discord import app_commands
 
 app = Quart(__name__)
 
 # Absolute data directory path inside Railway containers
 ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
-
-def _get_roblox_redirect_uri() -> str:
-    return "https://replit.app"
 
 def _load_roblox_links() -> dict:
     if not os.path.exists(ROBLOX_LINKS_FILE):
@@ -76,18 +24,86 @@ def _load_roblox_links() -> dict:
 def _save_roblox_links(data: dict) -> None:
     os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
     with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
-        try:
-        # FIXED: Correctly extracts the string from the split list before converting to an integer
-        discord_id_raw = state.split(":", 1)[0]
-        discord_id = int(discord_id_raw)
-    except (ValueError, IndexError):
+        json.dump(data, f, indent=2)
 
+def _store_roblox_link(discord_id: int, token_data: dict) -> None:
     links = _load_roblox_links()
     links[str(discord_id)] = token_data
     _save_roblox_links(links)
 
-def _load_roblox_link(discord_id: int) -> dict | None:
-    links = _load_roblox_links()
+async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
+    client_id = os.getenv("ROBLOX_CLIENT_ID", "")
+    client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
+    
+    if not client_id or not client_secret or client_id.startswith("YOUR_"):
+        print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
+        return {}
+        
+    payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": "https://replit.app",
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://roblox.com",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as r:
+            try:
+                return await r.json()
+            except Exception:
+                return {}
+
+@app.route("/api/roblox/callback")
+async def roblox_callback():
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+    
+    if error:
+        return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
+    if not code or not state:
+        return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
+        
+    try:
+        discord_id_raw = state.split(":", 1)[0]
+        discord_id = int(discord_id_raw)
+    except (ValueError, IndexError):
+        return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
+
+    real_redirect = "https://replit.app"
+    try:
+        token_data = await _exchange_roblox_code(code, real_redirect)
+    except Exception as e:
+        print(f"❌ Error exchanging code: {e}")
+        token_data = {}
+
+    if not token_data or not token_data.get("access_token"):
+        return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
+
+    _store_roblox_link(discord_id, token_data)
+    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
+
+# ==========================================
+# DISCORD BOT INITIALIZATION WITH SYNC HOOK
+# ==========================================
+class MyBot(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.message_content = True  
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        print("🔄 Syncing global application slash commands with Discord...")
+        await self.tree.sync()
+        print("✅ Slash commands successfully synchronised globally!")
+
+bot = MyBot()
+
     return links.get(str(discord_id))
 
 async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
@@ -3218,4 +3234,30 @@ if not token:
 if os.environ.get("BOT_TEST_MODE", "").lower() in {"1", "true", "yes", "on"}:
     print("Skipping Discord login in test mode.")
 else:
-    bot.run(token)
+  # ==========================================
+# MAIN RUNNER (NATIVE CO-EXISTENCE)
+# ==========================================
+async def main():
+    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+    if not DISCORD_TOKEN:
+        print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
+        return
+
+    port = int(os.environ.get("PORT", 8080))
+    print(f"📡 Web engine launching natively on Railway container port: {port}")
+    
+    from hypercorn.asyncio import serve
+    from hypercorn.config import Config
+    
+    hypercorn_config = Config()
+    hypercorn_config.bind = [f"0.0.0.0:{port}"]
+
+    # This keeps both your custom commands and the web gateway online 24/7
+    await asyncio.gather(
+        serve(app, hypercorn_config), 
+        bot.start(DISCORD_TOKEN)      
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
