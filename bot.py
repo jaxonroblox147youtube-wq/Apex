@@ -87,28 +87,22 @@ async def roblox_callback():
         return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
 
     _store_roblox_link(discord_id, token_data)
-    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
-
-# ==========================================
-# DISCORD BOT INITIALIZATION WITH SYNC HOOK
-# ==========================================
 class MyBot(commands.Bot):
     def __init__(self):
-        # Using prefix '!' internally so it doesn't break slash commands
-        intents = discord.Intents.default()
-        intents.message_content = True  
+        # 1. Turn on ALL intents so it can read your old command context files
+        intents = discord.Intents.all()  
+        
+        # 2. Maintain your native command prefix structure
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
         print("🔄 Syncing global application slash commands with Discord...")
+        # 3. This forces an immediate global push of your slash trees
         await self.tree.sync()
         print("✅ Slash commands successfully synchronised globally!")
 
 bot = MyBot()
 
-# ==========================================
-# DISCORD BOT INITIALIZATION WITH SYNC HOOK
-# ==========================================
 class MyBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -151,6 +145,17 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
 
 @bot.event
 async def on_ready():
+
+
+@bot.command(name="hard_sync")
+@commands.is_owner()
+async def hard_sync(ctx):
+    try:
+        bot.tree.copy_global_to(guild=ctx.guild)
+        await bot.tree.sync(guild=ctx.guild)
+        await ctx.send("⚡ Slash commands forced!")
+    except Exception as e:
+        await ctx.send(f"❌ Sync failed: {e}")
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
     print("🤖 Discord bot is alive and operational!")
 
