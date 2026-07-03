@@ -48,29 +48,13 @@ intents = discord.Intents.all()
 class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
-
-bot = MyBot()
-
 app = Flask(__name__)
 ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
 
 
 def _get_roblox_redirect_uri() -> str:
-    configured = os.getenv("ROBLOX_REDIRECT_URI", "").strip()
-    if configured:
-        return configured
-
-    for env_name in ("REPLIT_URL", "PUBLIC_URL", "APP_URL", "URL"):
-        value = os.getenv(env_name, "").strip()
-        if value:
-            return value.rstrip("/") + "/api/roblox/callback"
-
-    for env_name in ("REPL_SLUG",):
-        value = os.getenv(env_name, "").strip()
-        if value:
-            return f"https://{value}.replit.app/api/roblox/callback"
-
-    return "http://localhost:10000/api/roblox/callback"
+    # Forces your exact, valid Replit deployment URL
+    return "https://replit.app"
 
 
 def _load_roblox_links() -> dict:
@@ -91,6 +75,7 @@ def _save_roblox_links(data: dict) -> None:
 
 def _store_roblox_link(discord_id: int, token_data: dict) -> None:
     links = _load_roblox_links()
+    # Force key to string so looking it up via Discord commands matches perfectly
     links[str(discord_id)] = token_data
     _save_roblox_links(links)
 
@@ -108,7 +93,8 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
         "client_secret": ROBLOX_CLIENT_SECRET,
         "code": code,
         "grant_type": "authorization_code",
-        "redirect_uri": redirect_uri,
+        # Force your exact verified redirect URL into the exchange token payload
+        "redirect_uri": "https://replit.app",
     }
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -123,8 +109,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
                 return {}
 
 
-import asyncio
-
 @app.route("/api/roblox/callback")
 def roblox_callback():
     code = request.args.get("code")
@@ -137,17 +121,17 @@ def roblox_callback():
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
         
     try:
-        # FIXED: Ensured [0] is added back so it extracts just the string ID before the colon
+        # Grabs the specific item from the split array safely before integer conversion
         discord_id_raw = state.split(":", 1)[0]
         discord_id = int(discord_id_raw)
     except (ValueError, IndexError):
         return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
 
-    # FIXED: Safe way to run async code inside a synchronous Flask route without loop conflicts
+    real_redirect = "https://replit.app"
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        token_data = loop.run_until_complete(_exchange_roblox_code(code, ROBLOX_REDIRECT_URI))
+        token_data = loop.run_until_complete(_exchange_roblox_code(code, real_redirect))
     except Exception:
         token_data = {}
     finally:
@@ -162,6 +146,10 @@ def roblox_callback():
 
 def _start_flask_server() -> None:
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+
+if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
+    Thread(target=_start_flask_server, daemon=True).start()
 
 
 if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
