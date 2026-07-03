@@ -146,16 +146,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
 @bot.event
 async def on_ready():
 
-
-@bot.command(name="hard_sync")
-@commands.is_owner()
-async def hard_sync(ctx):
-    try:
-        bot.tree.copy_global_to(guild=ctx.guild)
-        await bot.tree.sync(guild=ctx.guild)
-        await ctx.send("⚡ Slash commands forced!")
-    except Exception as e:
-        await ctx.send(f"❌ Sync failed: {e}")
     print(f"Logged in as {bot.user.name} ({bot.user.id})")
     print("🤖 Discord bot is alive and operational!")
 
