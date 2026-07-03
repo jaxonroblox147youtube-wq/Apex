@@ -52,18 +52,16 @@ import os
 import json
 import asyncio
 import aiohttp
-from threading import Thread
-from flask import Flask, request
-import discord # Make sure to add discord.py to your requirements.txt
+from quart import Quart, request # Replaced Flask with Quart
+import discord
 from discord.ext import commands
 
-app = Flask(__name__)
+app = Quart(__name__)
 
-# Force an absolute data directory path that works flawlessly inside Railway containers
+# Absolute data directory path inside Railway containers
 ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
 
 def _get_roblox_redirect_uri() -> str:
-    # Forces your exact, valid production callback URL
     return "https://replit.app"
 
 def _load_roblox_links() -> dict:
@@ -78,11 +76,13 @@ def _load_roblox_links() -> dict:
 def _save_roblox_links(data: dict) -> None:
     os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
     with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        try:
+        # FIXED: Correctly extracts the string from the split list before converting to an integer
+        discord_id_raw = state.split(":", 1)[0]
+        discord_id = int(discord_id_raw)
+    except (ValueError, IndexError):
 
-def _store_roblox_link(discord_id: int, token_data: dict) -> None:
     links = _load_roblox_links()
-    # Force key to string so looking it up via Discord commands matches perfectly
     links[str(discord_id)] = token_data
     _save_roblox_links(links)
 
@@ -91,7 +91,6 @@ def _load_roblox_link(discord_id: int) -> dict | None:
     return links.get(str(discord_id))
 
 async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
-    # Safely fetch credentials from environment variables populated via Railway Variables dashboard
     client_id = os.getenv("ROBLOX_CLIENT_ID", "")
     client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
     
@@ -119,7 +118,7 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
                 return {}
 
 @app.route("/api/roblox/callback")
-def roblox_callback():
+async def roblox_callback(): # Changed to async
     code = request.args.get("code")
     state = request.args.get("state")
     error = request.args.get("error")
@@ -130,7 +129,7 @@ def roblox_callback():
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
         
     try:
-        # FIXED: Added [0] to extract the string value from the split array before conversion
+        # FIXED: Corrected unpacking. Previously assigned a full list directly to an int.
         discord_id_raw = state.split(":", 1)[0]
         discord_id = int(discord_id_raw)
     except (ValueError, IndexError):
@@ -138,15 +137,11 @@ def roblox_callback():
 
     real_redirect = "https://replit.app"
     try:
-        # Safe execution wrapper for synchronous Flask web requests executing asynchronous network requests
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        token_data = loop.run_until_complete(_exchange_roblox_code(code, real_redirect))
+        # FIXED: Quart runs directly on the async loop, no need to create hacky secondary loops!
+        token_data = await _exchange_roblox_code(code, real_redirect)
     except Exception as e:
-        print(f"❌ Async loop error inside Flask route: {e}")
+        print(f"❌ Error exchanging code: {e}")
         token_data = {}
-    finally:
-        loop.close()
 
     if not token_data or not token_data.get("access_token"):
         return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
@@ -154,15 +149,50 @@ def roblox_callback():
     _store_roblox_link(discord_id, token_data)
     return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
 
-def _start_flask_server() -> None:
-    # Railway automatically binds and injects the proper internal PORT variable to expose your service
-    port = int(os.environ.get("PORT", 8080))
-    print(f"📡 Web engine launching on Railway container port: {port}")
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+# ==========================================
+# DISCORD BOT INITIALIZATION
+# ==========================================
+intents = discord.Intents.default()
+intents.message_content = True  
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.name} ({bot.user.id})")
+    print("🤖 Discord bot is alive and operational!")
 
 # ==========================================
-# DISCORD BOT STARTUP & RAILWAY BINDING
+# MAIN RUNNER (NATIVE CO-EXISTENCE)
 # ==========================================
+async def main():
+    # 1. Fetch token
+    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+    if not DISCORD_TOKEN:
+        print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
+        return
+
+    # 2. Configure the Quart Web Server Task
+    port = int(os.environ.get("PORT", 8080))
+    config = app.make_config()
+    config.bind = [f"0.0.0.0:{port}"]
+    
+    print(f"📡 Web engine launching natively on Railway container port: {port}")
+    
+    # 3. Force both tasks to run together on the same loop asynchronously
+    from hypercorn.asyncio import serve
+    from hypercorn.config import Config
+    
+    hypercorn_config = Config()
+    hypercorn_config.bind = [f"0.0.0.0:{port}"]
+
+    await asyncio.gather(
+        serve(app, hypercorn_config), # Keeps web port open for Railway
+        bot.start(DISCORD_TOKEN)      # Keeps the Discord Bot running
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
 
 # 1. Start the web server thread so Railway sees an active port immediately
 if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
