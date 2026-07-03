@@ -123,23 +123,37 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
                 return {}
 
 
+import asyncio
+
 @app.route("/api/roblox/callback")
 def roblox_callback():
     code = request.args.get("code")
     state = request.args.get("state")
     error = request.args.get("error")
+    
     if error:
         return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
     if not code or not state:
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
+        
     try:
+        # FIXED: Ensured [0] is added back so it extracts just the string ID before the colon
         discord_id_raw = state.split(":", 1)[0]
         discord_id = int(discord_id_raw)
-    except ValueError:
+    except (ValueError, IndexError):
         return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
 
-    token_data = asyncio.run(_exchange_roblox_code(code, ROBLOX_REDIRECT_URI))
-    if not token_data.get("access_token"):
+    # FIXED: Safe way to run async code inside a synchronous Flask route without loop conflicts
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        token_data = loop.run_until_complete(_exchange_roblox_code(code, ROBLOX_REDIRECT_URI))
+    except Exception:
+        token_data = {}
+    finally:
+        loop.close()
+
+    if not token_data or not token_data.get("access_token"):
         return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
 
     _store_roblox_link(discord_id, token_data)

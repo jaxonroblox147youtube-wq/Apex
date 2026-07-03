@@ -31,3 +31,4 @@ if __name__ == "__main__":
         bot.bot.run(token)
     else:
         print("❌ Error: Please set your real DISCORD_TOKEN in Replit Secrets!")
+    
