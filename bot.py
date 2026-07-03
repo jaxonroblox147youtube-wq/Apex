@@ -92,10 +92,14 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=discord.Intents.all())
 
     async def setup_hook(self):
-        print("Automatic background sync activated")
-        await self.tree.sync()
-        print("Global slash tree automated!")
-
+        print("Instant local guild sync activated")
+        for guild in self.guilds:
+            try:
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+            except Exception:
+                pass
+        print("Guild trees synchronized instantly!")
 bot = MyBot()
 
 class MyBot(commands.Bot):
