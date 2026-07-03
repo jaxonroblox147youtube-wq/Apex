@@ -137,63 +137,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
                 return {}
 
 @bot.event
-async def on_ready():
-    print("Bot is reading websocket layers...")
-    try:
-        await bot.tree.sync()
-        for guild in bot.guilds:
-            bot.tree.copy_global_to(guild=guild)
-            await bot.tree.sync(guild=guild)
-        print("⚡ True Auto-Sync: Slash command badge pushed instantly!")
-    except Exception as e:
-        print(f"Sync delay: {e}")
-
-# ==========================================
-# MAIN RUNNER (NATIVE CO-EXISTENCE)
-# ==========================================
-async def main():
-    # 1. Fetch token
-    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-    if not DISCORD_TOKEN:
-        print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
-        return
-
-    # 2. Configure the Quart Web Server Task
-    port = int(os.environ.get("PORT", 8080))
-    config = app.make_config()
-    config.bind = [f"0.0.0.0:{port}"]
-
-    print(f"📡 Web engine launching natively on Railway container port: {port}")
-
-    # 3. Force both tasks to run together on the same loop asynchronously
-    from hypercorn.asyncio import serve
-    from hypercorn.config import Config
-
-    hypercorn_config = Config()
-    hypercorn_config.bind = [f"0.0.0.0:{port}"]
-
-    await asyncio.gather(
-        serve(app, hypercorn_config), # Keeps web port open for Railway
-        bot.start(DISCORD_TOKEN)      # Keeps the Discord Bot running
-    )
-
-if __name__ == "__main__":
-    asyncio.run(main())
-
-
-# 1. Start the web server thread so Railway sees an active port immediately
-if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
-    Thread(target=_start_flask_server, daemon=True).start()
-
-# 2. Initialize your actual Discord Bot
-intents = discord.Intents.default()
-intents.message_content = True  # Enable this if your bot reads message content
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user.name} ({bot.user.id})")
-    print("🤖 Discord bot is alive and operational!")
 
 
 def _save_roblox_links(data: dict) -> None:
@@ -3176,6 +3119,65 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 # ═════════════════════════════════════════════════════════════════════════════
 # RUN (NATIVE CO-EXISTENCE)
 # ═════════════════════════════════════════════════════════════════════════════
+
+async def on_ready():
+    print("Bot is reading websocket layers...")
+    try:
+        await bot.tree.sync()
+        for guild in bot.guilds:
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
+        print("⚡ True Auto-Sync: Slash command badge pushed instantly!")
+    except Exception as e:
+        print(f"Sync delay: {e}")
+
+# ==========================================
+# MAIN RUNNER (NATIVE CO-EXISTENCE)
+# ==========================================
+async def main():
+    # 1. Fetch token
+    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+    if not DISCORD_TOKEN:
+        print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
+        return
+
+    # 2. Configure the Quart Web Server Task
+    port = int(os.environ.get("PORT", 8080))
+    config = app.make_config()
+    config.bind = [f"0.0.0.0:{port}"]
+
+    print(f"📡 Web engine launching natively on Railway container port: {port}")
+
+    # 3. Force both tasks to run together on the same loop asynchronously
+    from hypercorn.asyncio import serve
+    from hypercorn.config import Config
+
+    hypercorn_config = Config()
+    hypercorn_config.bind = [f"0.0.0.0:{port}"]
+
+    await asyncio.gather(
+        serve(app, hypercorn_config), # Keeps web port open for Railway
+        bot.start(DISCORD_TOKEN)      # Keeps the Discord Bot running
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+# 1. Start the web server thread so Railway sees an active port immediately
+if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
+    Thread(target=_start_flask_server, daemon=True).start()
+
+# 2. Initialize your actual Discord Bot
+intents = discord.Intents.default()
+intents.message_content = True  # Enable this if your bot reads message content
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.name} ({bot.user.id})")
+    print("🤖 Discord bot is alive and operational!")
+
 
 async def main():
     DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
