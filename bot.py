@@ -70,9 +70,10 @@ async def roblox_callback():
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
         
     try:
-        discord_id_raw = state.split(":", 1)[0]
-        discord_id = int(discord_id_raw)
-    except (ValueError, IndexError):
+        # GUARANTEED FIX: Splits the string and safely takes index 0 to get the string ID out of the list
+        state_parts = state.split(":", 1)
+        discord_id = int(state_parts[0])
+    except (ValueError, IndexError, TypeError):
         return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
 
     real_redirect = "https://replit.app"
@@ -87,6 +88,23 @@ async def roblox_callback():
 
     _store_roblox_link(discord_id, token_data)
     return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
+
+# ==========================================
+# DISCORD BOT INITIALIZATION WITH SYNC HOOK
+# ==========================================
+class MyBot(commands.Bot):
+    def __init__(self):
+        # Using prefix '!' internally so it doesn't break slash commands
+        intents = discord.Intents.default()
+        intents.message_content = True  
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        print("🔄 Syncing global application slash commands with Discord...")
+        await self.tree.sync()
+        print("✅ Slash commands successfully synchronised globally!")
+
+bot = MyBot()
 
 # ==========================================
 # DISCORD BOT INITIALIZATION WITH SYNC HOOK
@@ -3207,9 +3225,6 @@ async def on_interaction(interaction: discord.Interaction):
                 await interaction.response.send_message(cmd["response"])
                 return  # handled — tree has nothing scheduled for this command
 
-    # Built-in slash commands are processed automatically by the tree
-    # before on_interaction fires — no extra call needed here.
-
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
@@ -3224,23 +3239,18 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         await _reply_interaction(interaction, f"❌ An error occurred: {error}", ephemeral=True)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# RUN
+# RUN (NATIVE CO-EXISTENCE)
 # ═════════════════════════════════════════════════════════════════════════════
 
-token = os.environ.get("DISCORD_TOKEN")
-if not token:
-    raise ValueError("DISCORD_TOKEN is not set. Add it to your secrets.")
-
-if os.environ.get("BOT_TEST_MODE", "").lower() in {"1", "true", "yes", "on"}:
-    print("Skipping Discord login in test mode.")
-else:
-  # ==========================================
-# MAIN RUNNER (NATIVE CO-EXISTENCE)
-# ==========================================
 async def main():
     DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
     if not DISCORD_TOKEN:
         print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
+        return
+
+    # Check for Test Mode before binding loops
+    if os.environ.get("BOT_TEST_MODE", "").lower() in {"1", "true", "yes", "on"}:
+        print("Skipping Discord login in test mode.")
         return
 
     port = int(os.environ.get("PORT", 8080))
@@ -3252,7 +3262,7 @@ async def main():
     hypercorn_config = Config()
     hypercorn_config.bind = [f"0.0.0.0:{port}"]
 
-    # This keeps both your custom commands and the web gateway online 24/7
+    # Run the web server and the discord bot concurrently in the same loop
     await asyncio.gather(
         serve(app, hypercorn_config), 
         bot.start(DISCORD_TOKEN)      
@@ -3260,4 +3270,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
