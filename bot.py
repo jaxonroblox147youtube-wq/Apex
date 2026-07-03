@@ -92,14 +92,8 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=discord.Intents.all())
 
     async def setup_hook(self):
-        print("Instant local guild sync activated")
-        for guild in self.guilds:
-            try:
-                self.tree.copy_global_to(guild=guild)
-                await self.tree.sync(guild=guild)
-            except Exception:
-                pass
-        print("Guild trees synchronized instantly!")
+        print("Background web engines linked")
+
 bot = MyBot()
 
 class MyBot(commands.Bot):
@@ -144,9 +138,15 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
 
 @bot.event
 async def on_ready():
-
-    print(f"Logged in as {bot.user.name} ({bot.user.id})")
-    print("🤖 Discord bot is alive and operational!")
+    print("Bot is reading websocket layers...")
+    try:
+        await bot.tree.sync()
+        for guild in bot.guilds:
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
+        print("⚡ True Auto-Sync: Slash command badge pushed instantly!")
+    except Exception as e:
+        print(f"Sync delay: {e}")
 
 # ==========================================
 # MAIN RUNNER (NATIVE CO-EXISTENCE)
