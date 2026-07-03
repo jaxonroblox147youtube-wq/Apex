@@ -89,17 +89,12 @@ async def roblox_callback():
     _store_roblox_link(discord_id, token_data)
 class MyBot(commands.Bot):
     def __init__(self):
-        # 1. Turn on ALL intents so it can read your old command context files
-        intents = discord.Intents.all()  
-        
-        # 2. Maintain your native command prefix structure
-        super().__init__(command_prefix="!", intents=intents)
+        super().__init__(command_prefix="!", intents=discord.Intents.all())
 
     async def setup_hook(self):
-        print("🔄 Syncing global application slash commands with Discord...")
-        # 3. This forces an immediate global push of your slash trees
+        print("Automatic background sync activated")
         await self.tree.sync()
-        print("✅ Slash commands successfully synchronised globally!")
+        print("Global slash tree automated!")
 
 bot = MyBot()
 
