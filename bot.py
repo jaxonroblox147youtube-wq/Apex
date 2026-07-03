@@ -34,11 +34,11 @@ def _store_roblox_link(discord_id: int, token_data: dict) -> None:
 async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
     client_id = os.getenv("ROBLOX_CLIENT_ID", "")
     client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
-    
+
     if not client_id or not client_secret or client_id.startswith("YOUR_"):
         print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
         return {}
-        
+
     payload = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -63,12 +63,12 @@ async def roblox_callback():
     code = request.args.get("code")
     state = request.args.get("state")
     error = request.args.get("error")
-    
+
     if error:
         return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
     if not code or not state:
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
-        
+
     try:
         # GUARANTEED FIX: Splits the string and safely takes index 0 to get the string ID out of the list
         state_parts = state.split(":", 1)
@@ -117,21 +117,19 @@ class MyBot(commands.Bot):
 
     async def setup_hook(self):
         print("🔄 Syncing global application slash commands with Discord...")
-        await self.tree.sync()
-        print("✅ Slash commands successfully synchronised globally!")
-
-bot = MyBot()
-
+def _load_roblox_link(discord_id: int) -> dict | None:
+    links = _load_roblox_links()
     return links.get(str(discord_id))
+
 
 async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
     client_id = os.getenv("ROBLOX_CLIENT_ID", "")
     client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
-    
+
     if not client_id or not client_secret or client_id.startswith("YOUR_"):
         print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
         return {}
-        
+
     payload = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -156,12 +154,12 @@ async def roblox_callback(): # Changed to async
     code = request.args.get("code")
     state = request.args.get("state")
     error = request.args.get("error")
-    
+
     if error:
         return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
     if not code or not state:
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
-        
+
     try:
         # FIXED: Corrected unpacking. Previously assigned a full list directly to an int.
         discord_id_raw = state.split(":", 1)[0]
@@ -209,13 +207,13 @@ async def main():
     port = int(os.environ.get("PORT", 8080))
     config = app.make_config()
     config.bind = [f"0.0.0.0:{port}"]
-    
+
     print(f"📡 Web engine launching natively on Railway container port: {port}")
-    
+
     # 3. Force both tasks to run together on the same loop asynchronously
     from hypercorn.asyncio import serve
     from hypercorn.config import Config
-    
+
     hypercorn_config = Config()
     hypercorn_config.bind = [f"0.0.0.0:{port}"]
 
@@ -246,7 +244,7 @@ async def on_ready():
 if __name__ == "__main__":
     # Fetch token from Railway environment variables dashboard
     DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-    
+
     if not DISCORD_TOKEN:
         print("❌ Error: DISCORD_TOKEN is missing in Railway Variables!")
     else:
@@ -274,11 +272,11 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
     # Safely fetch credentials from environment variables populated via Railway Variables dashboard
     client_id = os.getenv("ROBLOX_CLIENT_ID", "")
     client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
-    
+
     if not client_id or not client_secret or client_id.startswith("YOUR_"):
         print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
         return {}
-        
+
     payload = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -303,12 +301,12 @@ def roblox_callback():
     code = request.args.get("code")
     state = request.args.get("state")
     error = request.args.get("error")
-    
+
     if error:
         return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
     if not code or not state:
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
-        
+
     try:
         # Grabs the specific string from the split array safely before integer conversion
         discord_id_raw = state.split(":", 1)[0]
@@ -379,11 +377,11 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
     # Safely fetch credentials from environment variables populated via Railway Variables dashboard
     client_id = os.getenv("ROBLOX_CLIENT_ID", "")
     client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
-    
+
     if not client_id or not client_secret or client_id.startswith("YOUR_"):
         print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
         return {}
-        
+
     payload = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -408,12 +406,12 @@ def roblox_callback():
     code = request.args.get("code")
     state = request.args.get("state")
     error = request.args.get("error")
-    
+
     if error:
         return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
     if not code or not state:
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
-        
+
     try:
         # Grabs the specific string from the split array safely before integer conversion
         discord_id_raw = state.split(":", 1)[0]
@@ -484,11 +482,11 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
     # Safely fetch credentials from environment variables populated via Railway Variables dashboard
     client_id = os.getenv("ROBLOX_CLIENT_ID", "")
     client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
-    
+
     if not client_id or not client_secret or client_id.startswith("YOUR_"):
         print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
         return {}
-        
+
     payload = {
         "client_id": client_id,
         "client_secret": client_secret,
@@ -513,12 +511,12 @@ def roblox_callback():
     code = request.args.get("code")
     state = request.args.get("state")
     error = request.args.get("error")
-    
+
     if error:
         return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
     if not code or not state:
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
-        
+
     try:
         # Grabs the specific string from the split array safely before integer conversion
         discord_id_raw = state.split(":", 1)[0]
@@ -3255,10 +3253,10 @@ async def main():
 
     port = int(os.environ.get("PORT", 8080))
     print(f"📡 Web engine launching natively on Railway container port: {port}")
-    
+
     from hypercorn.asyncio import serve
     from hypercorn.config import Config
-    
+
     hypercorn_config = Config()
     hypercorn_config.bind = [f"0.0.0.0:{port}"]
 
