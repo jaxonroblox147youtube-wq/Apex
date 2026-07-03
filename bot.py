@@ -48,6 +48,13 @@ intents = discord.Intents.all()
 class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
+import os
+import json
+import asyncio
+import aiohttp
+from threading import Thread
+from flask import Flask, request
+
 app = Flask(__name__)
 
 # Force an absolute data directory path that works flawlessly inside Railway containers
@@ -153,16 +160,7 @@ def _start_flask_server() -> None:
 
 if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
     Thread(target=_start_flask_server, daemon=True).start()
-app = Flask(__name__)
 
-# Force an absolute data directory path that works flawlessly inside Railway containers
-ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
-
-def _get_roblox_redirect_uri() -> str:
-    # Forces your exact, valid production callback URL
-    return "https://replit.app"
-
-def _load_roblox_links() -> dict:
     if not os.path.exists(ROBLOX_LINKS_FILE):
         return {}
     try:
