@@ -49,13 +49,13 @@ class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
 app = Flask(__name__)
+
+# Force an absolute data directory path that works flawlessly inside Railway containers
 ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
 
-
 def _get_roblox_redirect_uri() -> str:
-    # Forces your exact, valid Replit deployment URL
+    # Forces your exact, valid production callback URL
     return "https://replit.app"
-
 
 def _load_roblox_links() -> dict:
     if not os.path.exists(ROBLOX_LINKS_FILE):
@@ -66,12 +66,10 @@ def _load_roblox_links() -> dict:
     except Exception:
         return {}
 
-
 def _save_roblox_links(data: dict) -> None:
     os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
     with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
-
 
 def _store_roblox_link(discord_id: int, token_data: dict) -> None:
     links = _load_roblox_links()
@@ -79,26 +77,29 @@ def _store_roblox_link(discord_id: int, token_data: dict) -> None:
     links[str(discord_id)] = token_data
     _save_roblox_links(links)
 
-
 def _load_roblox_link(discord_id: int) -> dict | None:
     links = _load_roblox_links()
     return links.get(str(discord_id))
 
-
 async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
-    if ROBLOX_CLIENT_ID.startswith("YOUR_") or ROBLOX_CLIENT_SECRET.startswith("YOUR_"):
+    # Safely fetch credentials from environment variables populated via Railway Variables dashboard
+    client_id = os.getenv("ROBLOX_CLIENT_ID", "")
+    client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
+    
+    if not client_id or not client_secret or client_id.startswith("YOUR_"):
+        print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
         return {}
+        
     payload = {
-        "client_id": ROBLOX_CLIENT_ID,
-        "client_secret": ROBLOX_CLIENT_SECRET,
+        "client_id": client_id,
+        "client_secret": client_secret,
         "code": code,
         "grant_type": "authorization_code",
-        # Force your exact verified redirect URL into the exchange token payload
         "redirect_uri": "https://replit.app",
     }
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            "https://apis.roblox.com/oauth/v1/token",
+            "https://roblox.com",
             data=payload,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=aiohttp.ClientTimeout(total=10),
@@ -107,7 +108,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
                 return await r.json()
             except Exception:
                 return {}
-
 
 @app.route("/api/roblox/callback")
 def roblox_callback():
@@ -121,7 +121,7 @@ def roblox_callback():
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
         
     try:
-        # Grabs the specific item from the split array safely before integer conversion
+        # Grabs the specific string from the split array safely before integer conversion
         discord_id_raw = state.split(":", 1)[0]
         discord_id = int(discord_id_raw)
     except (ValueError, IndexError):
@@ -129,10 +129,12 @@ def roblox_callback():
 
     real_redirect = "https://replit.app"
     try:
+        # Safe execution wrapper for synchronous Flask web requests executing asynchronous network requests
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         token_data = loop.run_until_complete(_exchange_roblox_code(code, real_redirect))
-    except Exception:
+    except Exception as e:
+        print(f"❌ Async loop error inside Flask route: {e}")
         token_data = {}
     finally:
         loop.close()
@@ -143,26 +145,330 @@ def roblox_callback():
     _store_roblox_link(discord_id, token_data)
     return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
 
+def _start_flask_server() -> None:
+    # Railway automatically binds and injects the proper internal PORT variable to expose your service
+    port = int(os.environ.get("PORT", 8080))
+    print(f"📡 Web engine launching on Railway container port: {port}")
+    app.run(host="0.0.0.0", port=port)
+
+if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
+    Thread(target=_start_flask_server, daemon=True).start()
+app = Flask(__name__)
+
+# Force an absolute data directory path that works flawlessly inside Railway containers
+ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
+
+def _get_roblox_redirect_uri() -> str:
+    # Forces your exact, valid production callback URL
+    return "https://replit.app"
+
+def _load_roblox_links() -> dict:
+    if not os.path.exists(ROBLOX_LINKS_FILE):
+        return {}
+    try:
+        with open(ROBLOX_LINKS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_roblox_links(data: dict) -> None:
+    os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
+    with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+def _store_roblox_link(discord_id: int, token_data: dict) -> None:
+    links = _load_roblox_links()
+    # Force key to string so looking it up via Discord commands matches perfectly
+    links[str(discord_id)] = token_data
+    _save_roblox_links(links)
+
+def _load_roblox_link(discord_id: int) -> dict | None:
+    links = _load_roblox_links()
+    return links.get(str(discord_id))
+
+async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
+    # Safely fetch credentials from environment variables populated via Railway Variables dashboard
+    client_id = os.getenv("ROBLOX_CLIENT_ID", "")
+    client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
+    
+    if not client_id or not client_secret or client_id.startswith("YOUR_"):
+        print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
+        return {}
+        
+    payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": "https://replit.app",
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://roblox.com",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as r:
+            try:
+                return await r.json()
+            except Exception:
+                return {}
+
+@app.route("/api/roblox/callback")
+def roblox_callback():
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+    
+    if error:
+        return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
+    if not code or not state:
+        return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
+        
+    try:
+        # Grabs the specific string from the split array safely before integer conversion
+        discord_id_raw = state.split(":", 1)[0]
+        discord_id = int(discord_id_raw)
+    except (ValueError, IndexError):
+        return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
+
+    real_redirect = "https://replit.app"
+    try:
+        # Safe execution wrapper for synchronous Flask web requests executing asynchronous network requests
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        token_data = loop.run_until_complete(_exchange_roblox_code(code, real_redirect))
+    except Exception as e:
+        print(f"❌ Async loop error inside Flask route: {e}")
+        token_data = {}
+    finally:
+        loop.close()
+
+    if not token_data or not token_data.get("access_token"):
+        return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
+
+    _store_roblox_link(discord_id, token_data)
+    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
 
 def _start_flask_server() -> None:
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-
-
-if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
-    Thread(target=_start_flask_server, daemon=True).start()
-
+    # Railway automatically binds and injects the proper internal PORT variable to expose your service
+    port = int(os.environ.get("PORT", 8080))
+    print(f"📡 Web engine launching on Railway container port: {port}")
+    app.run(host="0.0.0.0", port=port)
 
 if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
     Thread(target=_start_flask_server, daemon=True).start()
+app = Flask(__name__)
 
-@tasks.loop(seconds=30)
-async def write_stats():
-    stats = {
-        "status": "online",
-        "servers": len(bot.guilds),
-        "users": sum(g.member_count or 0 for g in bot.guilds),
-        "latency_ms": round(bot.latency * 1000),
-        "uptime_seconds": round((datetime.datetime.utcnow() - BOT_START_TIME).total_seconds()) if BOT_START_TIME else 0,
+# Force an absolute data directory path that works flawlessly inside Railway containers
+ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
+
+def _get_roblox_redirect_uri() -> str:
+    # Forces your exact, valid production callback URL
+    return "https://replit.app"
+
+def _load_roblox_links() -> dict:
+    if not os.path.exists(ROBLOX_LINKS_FILE):
+        return {}
+    try:
+        with open(ROBLOX_LINKS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_roblox_links(data: dict) -> None:
+    os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
+    with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+def _store_roblox_link(discord_id: int, token_data: dict) -> None:
+    links = _load_roblox_links()
+    # Force key to string so looking it up via Discord commands matches perfectly
+    links[str(discord_id)] = token_data
+    _save_roblox_links(links)
+
+def _load_roblox_link(discord_id: int) -> dict | None:
+    links = _load_roblox_links()
+    return links.get(str(discord_id))
+
+async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
+    # Safely fetch credentials from environment variables populated via Railway Variables dashboard
+    client_id = os.getenv("ROBLOX_CLIENT_ID", "")
+    client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
+    
+    if not client_id or not client_secret or client_id.startswith("YOUR_"):
+        print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
+        return {}
+        
+    payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": "https://replit.app",
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://roblox.com",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as r:
+            try:
+                return await r.json()
+            except Exception:
+                return {}
+
+@app.route("/api/roblox/callback")
+def roblox_callback():
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+    
+    if error:
+        return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
+    if not code or not state:
+        return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
+        
+    try:
+        # Grabs the specific string from the split array safely before integer conversion
+        discord_id_raw = state.split(":", 1)[0]
+        discord_id = int(discord_id_raw)
+    except (ValueError, IndexError):
+        return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
+
+    real_redirect = "https://replit.app"
+    try:
+        # Safe execution wrapper for synchronous Flask web requests executing asynchronous network requests
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        token_data = loop.run_until_complete(_exchange_roblox_code(code, real_redirect))
+    except Exception as e:
+        print(f"❌ Async loop error inside Flask route: {e}")
+        token_data = {}
+    finally:
+        loop.close()
+
+    if not token_data or not token_data.get("access_token"):
+        return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
+
+    _store_roblox_link(discord_id, token_data)
+    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
+
+def _start_flask_server() -> None:
+    # Railway automatically binds and injects the proper internal PORT variable to expose your service
+    port = int(os.environ.get("PORT", 8080))
+    print(f"📡 Web engine launching on Railway container port: {port}")
+    app.run(host="0.0.0.0", port=port)
+
+if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
+    Thread(target=_start_flask_server, daemon=True).start()
+app = Flask(__name__)
+
+# Force an absolute data directory path that works flawlessly inside Railway containers
+ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
+
+def _get_roblox_redirect_uri() -> str:
+    # Forces your exact, valid production callback URL
+    return "https://replit.app"
+
+def _load_roblox_links() -> dict:
+    if not os.path.exists(ROBLOX_LINKS_FILE):
+        return {}
+    try:
+        with open(ROBLOX_LINKS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_roblox_links(data: dict) -> None:
+    os.makedirs(os.path.dirname(ROBLOX_LINKS_FILE), exist_ok=True)
+    with open(ROBLOX_LINKS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+def _store_roblox_link(discord_id: int, token_data: dict) -> None:
+    links = _load_roblox_links()
+    # Force key to string so looking it up via Discord commands matches perfectly
+    links[str(discord_id)] = token_data
+    _save_roblox_links(links)
+
+def _load_roblox_link(discord_id: int) -> dict | None:
+    links = _load_roblox_links()
+    return links.get(str(discord_id))
+
+async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
+    # Safely fetch credentials from environment variables populated via Railway Variables dashboard
+    client_id = os.getenv("ROBLOX_CLIENT_ID", "")
+    client_secret = os.getenv("ROBLOX_CLIENT_SECRET", "")
+    
+    if not client_id or not client_secret or client_id.startswith("YOUR_"):
+        print("⚠️ Warning: ROBLOX_CLIENT_ID or ROBLOX_CLIENT_SECRET is missing in Railway Variables!")
+        return {}
+        
+    payload = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": "https://replit.app",
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "https://roblox.com",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as r:
+            try:
+                return await r.json()
+            except Exception:
+                return {}
+
+@app.route("/api/roblox/callback")
+def roblox_callback():
+    code = request.args.get("code")
+    state = request.args.get("state")
+    error = request.args.get("error")
+    
+    if error:
+        return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
+    if not code or not state:
+        return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
+        
+    try:
+        # Grabs the specific string from the split array safely before integer conversion
+        discord_id_raw = state.split(":", 1)[0]
+        discord_id = int(discord_id_raw)
+    except (ValueError, IndexError):
+        return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
+
+    real_redirect = "https://replit.app"
+    try:
+        # Safe execution wrapper for synchronous Flask web requests executing asynchronous network requests
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        token_data = loop.run_until_complete(_exchange_roblox_code(code, real_redirect))
+    except Exception as e:
+        print(f"❌ Async loop error inside Flask route: {e}")
+        token_data = {}
+    finally:
+        loop.close()
+
+    if not token_data or not token_data.get("access_token"):
+        return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
+
+    _store_roblox_link(discord_id, token_data)
+    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
+
+def _start_flask_server() -> None:
+    # Railway automatically binds and injects the proper internal PORT variable to expose your service
+    port = int(os.environ.get("PORT", 8080))
+    print(f"📡 Web engine launching on Railway container port: {port}")
+    app.run(host="0.0.0.0", port=port)
+
+if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
+    Thread(target=_start_flask_server, daemon=True).start()
+) - BOT_START_TIME).total_seconds()) if BOT_START_TIME else 0,
         "command_count": 61,
         "updated_at": datetime.datetime.utcnow().isoformat() + "Z",
     }
