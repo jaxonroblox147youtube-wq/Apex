@@ -10,7 +10,7 @@ if not os.environ.get("DISCORD_TOKEN"):
     os.environ["DISCORD_TOKEN"] = "Fetch from secrets."
 
 # 3. Force your specific Roblox redirect URL into the environment
-os.environ["ROBLOX_REDIRECT_URI"] = "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback"
+os.environ["ROBLOX_REDIRECT_URI"] = "https://replit.app"
 
 # 4. Import your main bot file to load the setup
 import bot
