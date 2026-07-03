@@ -6,7 +6,7 @@ os.environ["BOT_TEST_MODE"] = "false"
 
 # 2. Safely load your Discord Token if it isn't already set in Replit Secrets
 if not os.environ.get("DISCORD_TOKEN"):
-    # Replace 'MTUwNzc3NjUyNDE4OTgyNzI0Mg.GK2n1b.qPpRNWgo1_AuL-m5l__CtD5YEefaPge1NgBtSw' if not using Replit Secrets
+    # Replace if not using Replit Secrets
     os.environ["DISCORD_TOKEN"] = "Fetch from secrets."
 
 # 3. Force your specific Roblox redirect URL into the environment
