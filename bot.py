@@ -128,7 +128,7 @@ def roblox_callback():
         return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
         
     try:
-        # Fixed: Splitting properly grabs the index 0 item out of the array
+        # FIXED: Added [0] to extract the string value from the split array before conversion
         discord_id_raw = state.split(":", 1)[0]
         discord_id = int(discord_id_raw)
     except (ValueError, IndexError):
@@ -161,8 +161,6 @@ def _start_flask_server() -> None:
 if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
     Thread(target=_start_flask_server, daemon=True).start()
 
-    try:
-        with open(ROBLOX_LINKS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
