@@ -18,7 +18,7 @@ import bot
 # 5. Core execution logic to launch everything
 if __name__ == "__main__":
     print("🚀 Starting the live Flask web server backend...")
-    # Ensures the background web server handles the Roblox OAuth callbacks
+    # Ensures the background web server handles the Roblox OAuth callback
     if hasattr(bot, 'app'):
         port = int(os.environ.get("PORT", 10000))
         Thread(target=lambda: bot.app.run(host="0.0.0.0", port=port), daemon=True).start()
