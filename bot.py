@@ -178,46 +178,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
             except Exception:
                 return {}
 
-@app.route("/api/roblox/callback")
-def roblox_callback():
-    code = request.args.get("code")
-    state = request.args.get("state")
-    error = request.args.get("error")
-
-    if error:
-        return f"<h1>Roblox link failed</h1><p>{error}</p>", 400
-    if not code or not state:
-        return "<h1>Roblox link failed</h1><p>Missing authorization data.</p>", 400
-
-    try:
-        # Grabs the specific string from the split array safely before integer conversion
-        discord_id_raw = state.split(":", 1)[0]
-        discord_id = int(discord_id_raw)
-    except (ValueError, IndexError):
-        return "<h1>Roblox link failed</h1><p>Invalid Discord user state.</p>", 400
-
-    real_redirect = "https://replit.app"
-    try:
-        # Safe execution wrapper for synchronous Flask web requests executing asynchronous network requests
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        token_data = loop.run_until_complete(_exchange_roblox_code(code, real_redirect))
-    except Exception as e:
-        print(f"❌ Async loop error inside Flask route: {e}")
-        token_data = {}
-    finally:
-        loop.close()
-
-    if not token_data or not token_data.get("access_token"):
-        return "<h1>Roblox link failed</h1><p>The bot could not exchange the authorization code with Roblox.</p>", 400
-
-    _store_roblox_link(discord_id, token_data)
-    return "<h1>✅ Roblox account linked</h1><p>You can now use the Roblox commands in Discord.</p>"
-
-def _start_flask_server() -> None:
-    # Railway automatically binds and injects the proper internal PORT variable to expose your service
-    port = int(os.environ.get("PORT", 8080))
-    print(f"📡 Web engine launching on Railway container port: {port}")
     app.run(host="0.0.0.0", port=port)
 
 if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
