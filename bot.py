@@ -179,11 +179,6 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
             except Exception:
                 return {}
 
-    app.run(host="0.0.0.0", port=port)
-
-if os.environ.get("BOT_TEST_MODE", "").lower() not in {"1", "true", "yes", "on"}:
-    Thread(target=_start_flask_server, daemon=True).start()
-app = Flask(__name__)
 
 # Force an absolute data directory path that works flawlessly inside Railway containers
 ROBLOX_LINKS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "roblox_links.json"))
