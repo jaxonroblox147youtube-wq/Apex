@@ -1,3 +1,4 @@
+from discord.ext import tasks
 from threading import Thread
 import os
 import json
