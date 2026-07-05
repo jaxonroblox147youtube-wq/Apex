@@ -239,7 +239,7 @@ async def _exchange_roblox_code(code: str, redirect_uri: str) -> dict:
             except Exception:
                 return {}
 
-@JaxonRoblo"
+YOUTUBE_HANDLE       = "@JaxonRoblo"
 YOUTUBE_LIVE_URL     = "https://www.youtube.com/@JaxonRoblo/live"
 YOUTUBE_CHANNEL_PAGE = "https://www.youtube.com/@JaxonRoblo"
 NOTIFY_SERVER_NAME   = "Meteor Run"          # partial match, case-insensitive
