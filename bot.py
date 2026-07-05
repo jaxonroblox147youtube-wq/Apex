@@ -2209,7 +2209,7 @@ async def roblox_roles(interaction: discord.Interaction):
         await interaction.followup.send("❌ Couldn't fetch group roles.", ephemeral=True)
         return
     embed = discord.Embed(
-        title=f"🎮 Roblox Group Roles",
+        title="🎮 Roblox Group Roles",
         color=discord.Color.from_rgb(226, 35, 26),
     )
     for r in sorted(roles, key=lambda x: x.get("rank", 0)):
@@ -2275,7 +2275,7 @@ async def roblox_game(interaction: discord.Interaction, name: str):
             if thumbs and thumbs[0].get("state") == "Completed":
                 thumb_url = thumbs[0]["imageUrl"]
 
-    play_url = f"https://www.roblox.com/games/{place_id}" if place_id else f"https://www.roblox.com"
+    play_url = f"https://www.roblox.com/games/{place_id}" if place_id else "https://www.roblox.com"
 
     def _fmt(n: int) -> str:
         if n >= 1_000_000: return f"{n/1_000_000:.1f}M"
