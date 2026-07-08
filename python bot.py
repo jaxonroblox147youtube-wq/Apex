@@ -70,14 +70,15 @@ YOUTUBE_CHANNEL_PAGE = "https://www.youtube.com/@JaxonRoblo"
 NOTIFY_SERVER_NAME   = "Meteor Run"          # partial match, case-insensitive
 NOTIFY_CHANNEL_KEYWORDS = ["video", "upload"] # channel must contain both words
 
-# Add this line right below your other global variables:
-sent_yt_notifacation = False
+_yt_was_live      = False
 _yt_was_scheduled = False
-_scheduled_msg: discord.Message | None = None   # message to edit when live starts
-_last_video_id    = None   # tracks newest upload from RSS
-_yt_channel_id    = None   # resolved once at startup
-_yt_live_title    = None   # title of current live stream
+_scheduled_msg: discord.Message | None = None   
+_last_video_id    = None   
+_yt_channel_id    = None   
+_yt_live_title    = None   
 
+# Add this line right here!
+sent_yt_notifacation = False
 YT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -147,7 +148,7 @@ def _make_embed(*, kind: str, title: str, url: str) -> tuple[str, discord.Embed]
         color=colour,
     )
     embed.set_author(name="JaxonRoblo", url=YOUTUBE_CHANNEL_PAGE)
-    embed.set_footer(text="YouTube • " + datetime.datetime.utcnow().strftime("%b %d, %Y"))
+    embed.set_footer(text="YouTube • " + datetime.datetime.now(datetime.timezone.utc).strftime("%b %d, %Y"))
     return f"@everyone {headline}", embed
 
 @tasks.loop(seconds=60)
@@ -162,6 +163,7 @@ async def check_youtube():
     """
     global _yt_was_live, _yt_was_scheduled, _scheduled_msg
     global _last_video_id, _yt_channel_id, _yt_live_title
+    global sent_yt_notifacation  # 🌟 Links the variable here to fix Pylance line 306!
 
     try:
         async with aiohttp.ClientSession(headers=YT_HEADERS) as session:
@@ -198,6 +200,7 @@ async def check_youtube():
             # Channel is live when: redirected to a video AND no upcoming marker AND
             # (content confirms live OR we already trust the redirect alone)
             is_scheduled = has_broadcast and is_upcoming
+
             is_live      = redirected_to_video and not is_upcoming
 
             # Debug output every cycle so you can see exactly what was detected
@@ -317,7 +320,7 @@ async def before_yt_check():
 @bot.event
 async def on_ready():
     global BOT_START_TIME
-    BOT_START_TIME = datetime.datetime.utcnow()
+    BOT_START_TIME = datetime.datetime.now(datetime.timezone.utc)
     await bot.change_presence(
         activity=discord.Activity(type=discord.ActivityType.watching, name="over the server 👀")
     )
@@ -329,6 +332,7 @@ async def on_ready():
 _AUTOMOD_LOG_NAMES = ("automod-log", "automod-logs", "mod-log", "mod-logs",
                       "modlog", "modlogs", "audit-log", "audit-logs",
                       "logs", "bot-logs", "server-logs")
+
 
 def _find_automod_log_channel(guild: discord.Guild):
     """Return the best text channel for AutoMod logs, or None."""
