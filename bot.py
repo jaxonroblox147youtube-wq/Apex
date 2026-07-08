@@ -2206,659 +2206,77 @@ async def roblox_friends(interaction: discord.Interaction, username: str):
     )
     if friends:
         names = [f"[{f.get('displayName', f['name'])}](https://www.roblox.com/users/{f['id']}/profile)" for f in friends]
-        embed.description = " • ".join(names)
-    else:
-        embed.description = "No friends found or profile is private."
-    embed.set_footer(text=f"User ID: {uid}")
-    await interaction.followup.send(embed=embed)
-
-# ── /robloxgroup <name> — group lookup ───────────────────────────────────────
-@bot.tree.command(name="robloxgroup", description="Look up a Roblox group by name")
-@app_commands.describe(name="Group name to search")
-async def roblox_group_lookup(interaction: discord.Interaction, name: str):
-    await interaction.response.defer()
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"https://groups.roblox.com/v1/groups/search?keyword={name.replace(' ', '+')}&prioritizeExactMatch=true&limit=10",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            sdata = await r.json() if r.status == 200 else {}
-
-        results = sdata.get("data", [])
-        if not results:
-            await interaction.followup.send(f"❌ No groups found for **{name}**.", ephemeral=True)
-            return
-        g = results[0]
-        gid = g.get("id")
-
-        async with session.get(
-            f"https://groups.roblox.com/v1/groups/{gid}",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            gdata = await r.json() if r.status == 200 else g
-
-        # Group icon
-        async with session.get(
-            f"https://thumbnails.roblox.com/v1/groups/icons?groupIds={gid}&size=420x420&format=Png",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            idata = await r.json() if r.status == 200 else {}
-        icon_url = None
-        for entry in idata.get("data", []):
-            if entry.get("state") == "Completed":
-                icon_url = entry["imageUrl"]
-                break
-
-    owner     = gdata.get("owner") or {}
-    desc      = (gdata.get("description") or "No description.")[:300]
-    members   = gdata.get("memberCount", 0)
-    is_public = gdata.get("publicEntryAllowed", True)
-    verified  = gdata.get("hasVerifiedBadge", False)
-
-    embed = discord.Embed(
-        title=f"{gdata.get('name', name)} {'✅' if verified else ''}",
-        url=f"https://www.roblox.com/groups/{gid}",
-        description=desc,
-        color=discord.Color.from_rgb(226, 35, 26),
-    )
-    embed.add_field(name="👥 Members",    value=f"{members:,}",                          inline=True)
-    embed.add_field(name="👑 Owner",      value=owner.get("displayName", "None") if owner else "None", inline=True)
-    embed.add_field(name="🔓 Entry",      value="Open" if is_public else "Closed/Approval", inline=True)
-    if icon_url:
-        embed.set_thumbnail(url=icon_url)
-    embed.set_footer(text=f"Group ID: {gid}")
-    await interaction.followup.send(embed=embed)
-
-# ── /robloxpresence <username> — what is a user doing right now ───────────────
-@bot.tree.command(name="robloxpresence", description="Check what a Roblox user is currently doing")
-@app_commands.describe(username="Roblox username")
-async def roblox_presence(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            "https://users.roblox.com/v1/usernames/users",
-            json={"usernames": [username], "excludeBannedUsers": False},
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            udata = await r.json() if r.status == 200 else {}
-        users = udata.get("data", [])
-        if not users:
-            await interaction.followup.send(f"❌ User **{username}** not found.", ephemeral=True)
-            return
-        uid = users[0]["id"]
-        display = users[0].get("displayName", username)
-
-        async with session.post(
-            "https://presence.roblox.com/v1/presence/users",
-            json={"userIds": [uid]},
-            headers={"Content-Type": "application/json"},
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            pdata = await r.json() if r.status == 200 else {}
-
-        # Headshot
-        async with session.get(
-            f"https://thumbnails.roblox.com/v1/users/avatar-headshot"
-            f"?userIds={uid}&size=420x420&format=Png&isCircular=true",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            hdata = await r.json() if r.status == 200 else {}
-        headshot = None
-        for entry in hdata.get("data", []):
-            if entry.get("state") == "Completed":
-                headshot = entry["imageUrl"]
-                break
-
-    presences = pdata.get("userPresences", [{}])
-    p = presences[0] if presences else {}
-    ptype = p.get("userPresenceType", 0)
-    status_map = {
-        0: ("⚫ Offline",    discord.Color.dark_gray()),
-        1: ("🟢 Online",     discord.Color.green()),
-        2: ("🎮 In a Game",  discord.Color.from_rgb(226, 35, 26)),
-        3: ("🏗️ In Studio",  discord.Color.blurple()),
-    }
-    status_str, color = status_map.get(ptype, ("❓ Unknown", discord.Color.greyple()))
-
-    embed = discord.Embed(
-        title=f"{display}'s Presence",
-        url=f"https://www.roblox.com/users/{uid}/profile",
-        color=color,
-    )
-    embed.add_field(name="Status", value=status_str, inline=True)
-    if ptype == 2:
-        embed.add_field(name="🎮 Game", value=p.get("lastLocation", "Unknown"), inline=True)
-        place_id = p.get("placeId")
-        if place_id:
-            embed.add_field(name="▶️ Play", value=f"[Join Game](https://www.roblox.com/games/{place_id})", inline=True)
-    last_online = p.get("lastOnline", "")
-    if last_online:
-        embed.add_field(name="🕐 Last Seen", value=last_online[:19].replace("T", " ") + " UTC", inline=False)
-    if headshot:
-        embed.set_thumbnail(url=headshot)
-    embed.set_footer(text=f"User ID: {uid}")
-    await interaction.followup.send(embed=embed)
-
-# ── /robloxitem <name> — catalog item search ──────────────────────────────────
-@bot.tree.command(name="robloxitem", description="Search the Roblox catalog for an item")
-@app_commands.describe(name="Item name to search")
-async def roblox_item(interaction: discord.Interaction, name: str):
-    await interaction.response.defer()
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"https://catalog.roblox.com/v1/search/items?category=All&keyword={name.replace(' ', '+')}&limit=10&salesTypeFilter=1",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            sdata = await r.json() if r.status == 200 else {}
-
-        items = sdata.get("data", [])
-        if not items:
-            await interaction.followup.send(f"❌ No catalog items found for **{name}**.", ephemeral=True)
-            return
-        item = items[0]
-        item_id  = item.get("id")
-        item_type = item.get("itemType", "Asset")  # "Asset" or "Bundle"
-
-        # Get details
-        endpoint = "assets" if item_type == "Asset" else "bundles"
-        async with session.get(
-            f"https://economy.roblox.com/v2/{endpoint}/{item_id}/details",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            ddata = await r.json() if r.status == 200 else {}
-
-        # Thumbnail
-        async with session.get(
-            f"https://thumbnails.roblox.com/v1/assets?assetIds={item_id}&size=420x420&format=Png",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            tdata = await r.json() if r.status == 200 else {}
-        thumb = None
-        for entry in tdata.get("data", []):
-            if entry.get("state") == "Completed":
-                thumb = entry["imageUrl"]
-                break
-
-    creator   = ddata.get("Creator", {})
-    price     = ddata.get("PriceInRobux")
-    is_limited = ddata.get("IsLimited", False) or ddata.get("IsLimitedUnique", False)
-    remaining  = ddata.get("Remaining")
-    sales      = ddata.get("Sales", 0)
-    desc       = (ddata.get("Description") or "No description.")[:200]
-    asset_type = ddata.get("AssetTypeName", item_type)
-
-    embed = discord.Embed(
-        title=ddata.get("Name", name),
-        url=f"https://www.roblox.com/catalog/{item_id}",
-        description=desc,
-        color=discord.Color.from_rgb(226, 35, 26),
-    )
-    embed.add_field(name="🏷️ Type",    value=asset_type,                                      inline=True)
-    embed.add_field(name="💰 Price",   value=f"R${price:,}" if price else "Free / Off-sale", inline=True)
-    embed.add_field(name="🔨 Creator", value=creator.get("Name", "Unknown"),                  inline=True)
-    embed.add_field(name="🛒 Sales",   value=f"{sales:,}",                                    inline=True)
-    if is_limited:
-        embed.add_field(name="⚡ Limited", value=f"Remaining: {remaining}" if remaining is not None else "Yes", inline=True)
-    if thumb:
-        embed.set_thumbnail(url=thumb)
-    embed.set_footer(text=f"Item ID: {item_id}")
-    await interaction.followup.send(embed=embed)
-
-# ── /robloxgroups <username> — groups a user belongs to ──────────────────────
-@bot.tree.command(name="robloxgroups", description="List the Roblox groups a user is in")
-@app_commands.describe(username="Roblox username")
-async def roblox_user_groups(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            "https://users.roblox.com/v1/usernames/users",
-            json={"usernames": [username], "excludeBannedUsers": False},
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            udata = await r.json() if r.status == 200 else {}
-        users = udata.get("data", [])
-        if not users:
-            await interaction.followup.send(f"❌ User **{username}** not found.", ephemeral=True)
-            return
-        uid = users[0]["id"]
-        display = users[0].get("displayName", username)
-
-        async with session.get(
-            f"https://groups.roblox.com/v2/users/{uid}/groups/roles?includeLocked=false",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            gdata = await r.json() if r.status == 200 else {}
-
-    groups = gdata.get("data", [])
-    embed = discord.Embed(
-        title=f"🏘️ {display}'s Groups ({len(groups)} total)",
-        url=f"https://www.roblox.com/users/{uid}/profile",
-        color=discord.Color.from_rgb(226, 35, 26),
-    )
-    if not groups:
-        embed.description = "This user is not in any groups, or their groups are private."
-    else:
-        for entry in groups[:15]:
-            g    = entry.get("group", {})
-            role = entry.get("role", {})
-            gname = g.get("name", "?")
-            gid   = g.get("id", 0)
-            rname = role.get("name", "Member")
-            embed.add_field(
-                name=f"[{gname}](https://www.roblox.com/groups/{gid})",
-                value=f"Role: **{rname}** • {g.get('memberCount', 0):,} members",
-                inline=False,
-            )
-    embed.set_footer(text=f"User ID: {uid}")
-    await interaction.followup.send(embed=embed)
-
-# ── /robloxrap <username> — collectibles & RAP ────────────────────────────────
-@bot.tree.command(name="robloxrap", description="Show a Roblox user's limited items and total RAP")
-@app_commands.describe(username="Roblox username")
-async def roblox_rap(interaction: discord.Interaction, username: str):
-    await interaction.response.defer()
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            "https://users.roblox.com/v1/usernames/users",
-            json={"usernames": [username], "excludeBannedUsers": False},
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            udata = await r.json() if r.status == 200 else {}
-        users = udata.get("data", [])
-        if not users:
-            await interaction.followup.send(f"❌ User **{username}** not found.", ephemeral=True)
-            return
-        uid = users[0]["id"]
-        display = users[0].get("displayName", username)
-
-        async with session.get(
-            f"https://inventory.roblox.com/v1/users/{uid}/assets/collectibles"
-            f"?sortOrder=Desc&limit=100",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            cdata = await r.json() if r.status == 200 else {}
-
-    items = cdata.get("data", [])
-    if not items:
-        await interaction.followup.send(
-            f"❌ **{display}** has no collectibles, or their inventory is private.", ephemeral=True
-        )
-        return
-
-    total_rap = sum(i.get("recentAveragePrice", 0) for i in items)
-    embed = discord.Embed(
-        title=f"💎 {display}'s Limiteds — R${total_rap:,} RAP",
-        url=f"https://www.roblox.com/users/{uid}/profile",
-        color=discord.Color.gold(),
-    )
-    for item in items[:10]:
-        rap  = item.get("recentAveragePrice", 0)
-        name = item.get("name", "?")
-        embed.add_field(
-            name=name,
-            value=f"💰 RAP: R${rap:,}",
-            inline=True,
-        )
-    if len(items) > 10:
-        embed.set_footer(text=f"Showing 10 of {len(items)} limiteds • User ID: {uid}")
-    else:
-        embed.set_footer(text=f"{len(items)} limiteds • User ID: {uid}")
-    await interaction.followup.send(embed=embed)
-
-# ── /robloxserver <game name> — active game servers ───────────────────────────
-@bot.tree.command(name="robloxserver", description="Show active servers for a Roblox game")
-@app_commands.describe(game="Roblox game name to search")
-async def roblox_server(interaction: discord.Interaction, game: str):
-    await interaction.response.defer()
-    async with aiohttp.ClientSession() as session:
-        # Search for the game first
-        async with session.get(
-            f"https://games.roblox.com/v1/games/list?model.keyword={game.replace(' ', '+')}&model.maxRows=1",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            sdata = await r.json() if r.status == 200 else {}
-
-        games = sdata.get("games", [])
-        if not games:
-            await interaction.followup.send(f"❌ No game found for **{game}**.", ephemeral=True)
-            return
-
-        g         = games[0]
-        place_id  = g.get("placeId") or g.get("rootPlaceId")
-        game_name = g.get("name", game)
-        players   = g.get("playerCount", 0)
-
-        # Get public server list
-        async with session.get(
-            f"https://games.roblox.com/v1/games/{place_id}/servers/Public?sortOrder=Desc&limit=10",
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as r:
-            svdata = await r.json() if r.status == 200 else {}
-
-    servers = svdata.get("data", [])
-    embed = discord.Embed(
-        title=f"🖥️ {game_name} — Active Servers",
-        url=f"https://www.roblox.com/games/{place_id}",
-        color=discord.Color.from_rgb(226, 35, 26),
-        description=f"**{players:,}** players online across all servers.",
-    )
-    if not servers:
-        embed.add_field(name="No public servers found", value="The game may have no active servers or servers are private.", inline=False)
-    else:
-        for i, sv in enumerate(servers[:8], 1):
-            playing = sv.get("playing", 0)
-            maximum = sv.get("maxPlayers", 0)
-            ping    = sv.get("ping", 0)
-            fps     = round(sv.get("fps", 0), 1)
-            bar_filled = int((playing / maximum * 8)) if maximum else 0
-            bar = "█" * bar_filled + "░" * (8 - bar_filled)
-            embed.add_field(
-                name=f"Server #{i}",
-                value=f"`{bar}` {playing}/{maximum}\n📶 {ping}ms • {fps} FPS",
-                inline=True,
-            )
-    embed.set_footer(text=f"Place ID: {place_id}")
-    await interaction.followup.send(embed=embed)
-
-# ═════════════════════════════════════════════════════════════════════════════
-# SECTION 9 — CUSTOM COMMANDS & AUTO-MODERATION
-# ═════════════════════════════════════════════════════════════════════════════
-
-import re
-import time as _time
-
-URL_PATTERN = re.compile(r"https?://\S+|discord\.gg/\S+", re.IGNORECASE)
-
-@bot.event
-async def on_message(message: discord.Message):
-    if message.author.bot or not message.guild:
-        await bot.process_commands(message)
-        return
-
-    gid_str  = str(message.guild.id)
-    all_automod = load_json(AUTOMOD_FILE) or {}
-    automod  = all_automod.get(gid_str, {})
-    content  = message.content
-
-    # ── Word filter ──────────────────────────────────────────────────────────
-    wf = automod.get("word_filter", {})
-    if wf.get("enabled"):
-        lower = content.lower()
-        for word in wf.get("words", []):
-            if word.lower() in lower:
-                try:
-                    await message.delete()
-                    await message.channel.send(
-                        f"⚠️ {message.author.mention} — your message was removed (word filter).",
-                        delete_after=5,
-                    )
-                except discord.Forbidden:
-                    pass
-                return
-
-    # ── Anti-link ────────────────────────────────────────────────────────────
-    al = automod.get("anti_link", {})
-    if al.get("enabled") and URL_PATTERN.search(content):
-        try:
-            await message.delete()
-            await message.channel.send(
-                f"⚠️ {message.author.mention} — links are not allowed here.",
-                delete_after=5,
-            )
-        except discord.Forbidden:
-            pass
-        return
-
-    # ── Anti-spam ────────────────────────────────────────────────────────────
-    asp = automod.get("anti_spam", {})
-    if asp.get("enabled"):
-        gid  = message.guild.id
-        uid  = message.author.id
-        now  = _time.time()
-        win  = asp.get("window_seconds", 5)
-        limit = asp.get("max_messages", 5)
-        spam_tracker.setdefault(gid, {}).setdefault(uid, [])
-        spam_tracker[gid][uid] = [t for t in spam_tracker[gid][uid] if now - t < win]
-        spam_tracker[gid][uid].append(now)
-        if len(spam_tracker[gid][uid]) > limit:
+     @bot.tree.command(name="youtube_check", description="Check the status of any YouTube channel by handle")
+    @app_commands.describe(handle="The YouTube handle to check (e.g., @JaxonRoblo or @MrBeast)")
+    async def youtube_check(interaction: discord.Interaction, handle: str):
+        # Let the user know the bot is looking it up (prevents 3-second timeout error)
+        await interaction.response.defer()
+        
+        if not handle.startswith("@"):
+            handle = f"@{handle}"
+            
+        live_url = f"https://youtube.com{handle}/live"
+        channel_url = f"https://youtube.com{handle}"
+        
+        async with aiohttp.ClientSession(headers=YT_HEADERS) as session:
+            # Resolve the RSS channel ID
+            channel_id = await _resolve_yt_channel_id(session)
+            if not channel_id:
+                return await interaction.followup.send(f"❌ Could not find a YouTube channel matching {handle}. Check your spelling.")
+                
+            # Check current live/scheduled status
             try:
-                await message.delete()
-                timeout_until = discord.utils.utcnow() + datetime.timedelta(seconds=30)
-                await message.author.timeout(timeout_until, reason="Auto-mod: spamming")
-                await message.channel.send(
-                    f"⚠️ {message.author.mention} has been timed out for spamming.",
-                    delete_after=8,
-                )
-                spam_tracker[gid][uid] = []
-            except discord.Forbidden:
-                pass
-            return
-
-    # ── Custom prefix commands (!name) ───────────────────────────────────────
-    if content.startswith("!"):
-        trigger = content[1:].split()[0].lower()
-        all_cmds = load_json(CUSTOM_CMDS_FILE) or {}
-        cmds = all_cmds.get(gid_str, {})
-        if trigger in cmds:
-            cmd = cmds[trigger]
-            if cmd.get("owner_only"):
-                if not is_owner(type("_", (), {"user": message.author, "guild": message.guild})()):
-                    await message.channel.send("❌ Only the server owner can use this command.", delete_after=5)
-                    return
-            await message.channel.send(cmd["response"])
-            return
-
-    await bot.process_commands(message)
-
-# ═════════════════════════════════════════════════════════════════════════════
-# SECTION 9 — ERROR HANDLER
-# ═════════════════════════════════════════════════════════════════════════════
-
-@bot.event
-async def on_interaction(interaction: discord.Interaction):
-    """Handle custom slash commands registered via the dashboard.
-    Must always call tree.call_scheduled_callbacks to process built-in commands."""
-    if (
-        interaction.type == discord.InteractionType.application_command
-        and not interaction.response.is_done()
-    ):
-        data = interaction.data or {}
-        cmd_name = data.get("name", "")
-        gid_str  = str(interaction.guild_id) if interaction.guild_id else ""
-        if cmd_name and gid_str:
-            all_cmds = load_json(CUSTOM_CMDS_FILE) or {}
-            cmds = all_cmds.get(gid_str, {})
-            if cmd_name in cmds:
-                cmd = cmds[cmd_name]
-                if cmd.get("owner_only") and not is_owner(interaction):
-                    await interaction.response.send_message(
-                        "❌ Only the server owner can use this command.", ephemeral=True
-                    )
-                    return
-                await interaction.response.send_message(cmd["response"])
-                return  # handled — tree has nothing scheduled for this command
-
-    # Built-in slash commands are processed automatically by the tree
-    # before on_interaction fires — no extra call needed here.
-
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.CommandNotFound):
-        return
-    raise error
-
-@bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.CheckFailure):
-        await interaction.response.send_message("❌ Only the server owner can use this command.", ephemeral=True)
-    elif not interaction.response.is_done():
-        await interaction.response.send_message(f"❌ An error occurred: {error}", ephemeral=True)
-
-# ═════════════════════════════════════════════════════════════════════════════
-# RUN
-# ═════════════════════════════════════════════════════════════════════════════
-
-token = os.environ.get("DISCORD_TOKEN")
-if not token:
-    raise ValueError("DISCORD_TOKEN is not set. Add it to your secrets.")
-
-bot.run(token)
-# ──────────────────────────────────────────────────────────────────────────────
-# ROBLOX ACCOUNT FETCHING INTEGRATION (Paste this at the very end of your script)
-# ──────────────────────────────────────────────────────────────────────────────
-
-# CHANGE THIS to your actual Express server IP and Port
-BACKEND_API_URL = "http://YOUR_EXPRESS_SERVER_IP:PORT/api" 
-
-async def fetch_linked_roblox_account(discord_id: int) -> dict | None:
-    """Queries the Express backend API to get the linked Roblox account data."""
-    url = f"{BACKEND_API_URL}/roblox/user/{discord_id}"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
-                if response.status == 200:
-                    return await response.json()
-                elif response.status == 404:
-                    return None
-    except Exception as e:
-        print(f"Error connecting to backend API: {e}")
-    return None
-
-@bot.tree.command(name="robloxprofile", description="View a member's linked Roblox profile.")
-@app_commands.describe(member="The Discord member whose linked account you want to see.")
-async def robloxprofile(interaction: discord.Interaction, member: discord.Member = None):
-    target_member = member or interaction.user
-
-    # Defer response immediately to prevent the 3-second Discord timeout window
-    await interaction.response.defer()
-
-    # Fetch from your Express server
-    roblox_data = await fetch_linked_roblox_account(target_member.id)
-
-    if not roblox_data:
-        await interaction.followup.send(
-            f"❌ {target_member.mention} has not linked their Roblox account to this bot yet."
-        )
-        return
-
-    roblox_username = roblox_data.get("robloxUsername", "Unknown")
-    roblox_id = roblox_data.get("robloxId", "Unknown")
-
-    embed = discord.Embed(
-        title="🔗 Linked Account Found",
-        color=discord.Color.green(),
-        description=f"**Discord:** {target_member.mention}\n**Roblox:** [{roblox_username}](https://roblox.com{roblox_id}/profile)"
-    )
-    embed.add_field(name="Roblox Username", value=roblox_username, inline=True)
-    embed.add_field(name="Roblox User ID", value=f"`{roblox_id}`", inline=True)
-    embed.set_thumbnail(url=f"https://roblox.com{roblox_id}&width=150&height=150&format=png")
-
-    await interaction.followup.send(embed=embed)
-# ──────────────────────────────────────────────────────────────────────────────
-# FINAL ROBLOX OAUTH INTEGRATION (Pasted at the very end of your script)
-# ──────────────────────────────────────────────────────────────────────────────
-
-# Automatically map directly to your live Replit backend deployment!
-BACKEND_API_URL = "https://discord-bot-script--jaxonmarshall98.replit.app/api"
-
-async def fetch_linked_roblox_account(discord_id: int) -> dict | None:
-    """Queries your Replit Express backend to verify linking status,
-    then pulls live profile info from the Roblox API.
-    """
-    check_url = f"{BACKEND_API_URL}/roblox/linked/{discord_id}"
-    try:
-        async with aiohttp.ClientSession() as session:
-            # 1. Ask your Replit backend if this user has linked
-            async with session.get(check_url, timeout=aiohttp.ClientTimeout(total=6)) as response:
-                if response.status != 200:
-                    return None
-
-                backend_data = await response.json()
-                # If your backend file returns { "linked": false }
-                if not backend_data.get("linked"):
-                    return None
-
-                access_token = backend_data.get("access_token")
-
-            # 2. Use the verified access token to grab their real Roblox user profile information
-            roblox_profile_url = "https://roblox.com"
-            headers = {"Authorization": f"Bearer {access_token}"}
-
-            async with session.get(roblox_profile_url, headers=headers, timeout=aiohttp.ClientTimeout(total=6)) as roblox_res:
-                if roblox_res.status == 200:
-                    user_info = await roblox_res.json()
-                    return {
-                        "robloxId": user_info.get("sub"),             # Roblox User ID string
-                        "robloxUsername": user_info.get("name"),       # Current Display Name/Username
-                        "preferredName": user_info.get("preferred_username")
-                    }
-    except Exception as e:
-        print(f"[Roblox Integration Error] Could not parse profile: {e}")
-    return None
-
-@bot.tree.command(name="robloxprofile", description="View a member's linked Roblox profile.")
-@app_commands.describe(member="The Discord member whose linked account you want to see.")
-async def robloxprofile(interaction: discord.Interaction, member: discord.Member = None):
-    target_member = member or interaction.user
-
-    # Defer immediately to give your Replit and Roblox APIs ample time to finish processing
-    await interaction.response.defer()
-
-    # Fetch profile tracking
-    roblox_data = await fetch_linked_roblox_account(target_member.id)
-
-    if not roblox_data:
-        await interaction.followup.send(
-            f"❌ {target_member.mention} has not completed their Roblox link account setup yet."
-        )
-        return
-
-    roblox_username = roblox_data.get("robloxUsername", "Unknown")
-    roblox_id = roblox_data.get("robloxId", "Unknown")
-
-    embed = discord.Embed(
-        title="🔗 Linked Account Found",
-        color=discord.Color.green(),
-        description=f"**Discord User:** {target_member.mention}\n**Roblox User:** [{roblox_username}](https://roblox.com{roblox_id}/profile)"
-    )
-    embed.add_field(name="Roblox Name", value=f"`{roblox_username}`", inline=True)
-    embed.add_field(name="Roblox User ID", value=f"`{roblox_id}`", inline=True)
-    embed.set_thumbnail(url=f"https://roblox.com{roblox_id}&width=150&height=150&format=png")
-
-    await interaction.followup.send(embed=embed)
-@bot.tree.command(name="youtube_check", description="Check the status of any YouTube channel by handle")@app_commands.describe(handle="The YouTube handle to check (e.g., @JaxonRoblo or @MrBeast)")async def youtube_check(interaction: discord.Interaction, handle: str):# Let the user know the bot is looking it up (prevents 3-second timeout error)await interaction.response.defer()if not handle.startswith("@"):handle = f"@{handle}"live_url = f"youtube.com{handle}/live"channel_url = f"youtube.com{handle}"async with aiohttp.ClientSession(headers=YT_HEADERS) as session:# Resolve the RSS channel IDchannel_id = await _resolve_yt_channel_id(session, handle)if not channel_id:return await interaction.followup.send(f"❌ Could not find a YouTube channel matching {handle}. Check your spelling.")# Check current live/scheduled statusfinal_url = live_urlasync with session.get(live_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=10)) as r:final_url = str(r.url)live_page = await r.text()redirected_to_video = "watch?v=" in final_urlhas_broadcast       = '"isLiveBroadcast"' in live_page or redirected_to_videois_upcoming         = '"upcomingEventData"' in live_page# Get channel name / metadata if possibletitle_match = re.search(r'<meta name="title" content="([^"]+)"', live_page)stream_or_ch_title = title_match.group(1) if title_match else handle# Build appropriate response embedembed = discord.Embed(color=discord.Color.blue())embed.set_author(name=f"YouTube Status: {handle}", url=channel_url)if redirected_to_video and not is_upcoming:embed.title = f"🔴 Currently LIVE!"embed.description = f"Stream Title: {stream_or_ch_title}\n\n▶️ Click to Watch Live Now"embed.color = discord.Color.red()elif has_broadcast and is_upcoming:embed.title = f"📅 Upcoming Scheduled Stream!"embed.description = f"Scheduled Event: {stream_or_ch_title}\n\n🔔 Set a Reminder on YouTube"embed.color = discord.Color.orange()else:# Fall back to pulling their latest standard video upload from RSSrss_url = f"youtube.com{channel_id}"async with session.get(rss_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:if resp.status == 200:xml_text = await resp.text()root = ET.fromstring(xml_text)ns = {'ns': 'w3.org', 'yt': 'youtube.com'}entry = root.find('ns:entry', ns)if entry is not None:video_id = entry.find('yt:videoId', ns).textvideo_title = entry.find('ns:title', ns).textvideo_url = f"youtube.com{video_id}"embed.title = f"💤 Offline - Latest Upload:"embed.description = f"{video_title}\n\n📹 Watch Latest Video"embed.color = discord.Color.purple()else:embed.title = "💤 Offline"embed.description = f"This channel is currently offline and has no recent uploads."else:embed.title = "💤 Offline"embed.description = f"This channel is currently offline."await interaction.followup.send(embed=embed)Run token herebot.run("YOUR_TOKEN")
-    # ── THE COMMAND ADDED TO THE END OF THE SCRIPT ───────────────────────────────
-
-    # ── REPAIRED RSS FEED VIDEO UPLOADS CHECK ───────────────────────────
-    rss_url = f"https://youtube.com{channel_id}"
-    async with aiohttp.ClientSession(headers=YT_HEADERS) as session:
-        async with session.get(rss_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-            if resp.status == 200:
-                xml_text = await resp.text()
-                root = ET.fromstring(xml_text)
-                ns = {
-                    'ns': 'http://w3.org', 
-                    'yt': 'http://youtube.com'
-                }
-                entry = root.find('ns:entry', ns)
-
-                if entry is not None:
-                    video_id = entry.find('yt:videoId', ns).text
-                    video_title = entry.find('ns:title', ns).text
-                    video_url = f"https://youtube.com{video_id}"
-
-                    embed.title = "💤 Offline - Latest Upload:"
-                    embed.description = f"**{video_title}**\n\n[📹 Watch Latest Video]({video_url})"
-                    embed.color = discord.Color.purple()
-                else:
-                    embed.title = "💤 Offline"
-                    embed.description = "This channel is currently offline and has no recent uploads."
+                async with session.get(live_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                    final_url = str(r.url)
+                    live_page = await r.text()
+            except Exception as e:
+                return await interaction.followup.send(f"❌ Failed to connect to YouTube: {e}")
+                
+            # Parse the stream status
+            is_upcoming = '"upcomingEventData"' in live_page
+            is_live = "watch?v=" in final_url and not is_upcoming
+            
+            # Send the status update to the user
+            if is_live:
+                await interaction.followup.send(f"🔴 {handle} is currently **LIVE**! Watch here: {final_url}")
+            elif is_upcoming:
+                await interaction.followup.send(f"📅 {handle} has a **scheduled stream** waiting! Check it here: {final_url}")
             else:
-                embed.title = "💤 Offline"
-                embed.description = "This channel is currently offline."
-
-    await interaction.followup.send(embed=embed)
-
-    # ── RUN THE BOT CHASSIS ──────────────────────────────────────────────────────
-    # Make sure to replace token string with your actual Replit Secret variable!
-    # bot.run(os.environ['DISCORD_TOKEN'])
+                await interaction.followup.send(f"🎬 {handle} is currently offline. Channel link: {channel_url}")
+    @bot.tree.command(name="youtube_check", description="Check the status of any YouTube channel by handle")
+    @app_commands.describe(handle="The YouTube handle to check (e.g., @JaxonRoblo or @MrBeast)")
+    async def youtube_check(interaction: discord.Interaction, handle: str):
+        # Let the user know the bot is looking it up (prevents 3-second timeout error)
+        await interaction.response.defer()
+        
+        if not handle.startswith("@"):
+            handle = f"@{handle}"
+            
+        live_url = f"https://youtube.com{handle}/live"
+        channel_url = f"https://youtube.com{handle}"
+        
+        async with aiohttp.ClientSession(headers=YT_HEADERS) as session:
+            # Resolve the RSS channel ID
+            channel_id = await _resolve_yt_channel_id(session)
+            if not channel_id:
+                return await interaction.followup.send(f"❌ Could not find a YouTube channel matching {handle}. Check your spelling.")
+                
+            # Check current live/scheduled status
+            try:
+                async with session.get(live_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                    final_url = str(r.url)
+                    live_page = await r.text()
+            except Exception as e:
+                return await interaction.followup.send(f"❌ Failed to connect to YouTube: {e}")
+                
+            # Parse the stream status
+            is_upcoming = '"upcomingEventData"' in live_page
+            is_live = "watch?v=" in final_url and not is_upcoming
+            
+            # Send the status update to the user
+            if is_live:
+                await interaction.followup.send(f"🔴 {handle} is currently **LIVE**! Watch here: {final_url}")
+            elif is_upcoming:
+                await interaction.followup.send(f"📅 {handle} has a **scheduled stream** waiting! Check it here: {final_url}")
+            else:
+                await interaction.followup.send(f"🎬 {handle} is currently offline. Channel link: {channel_url}")
