@@ -2206,77 +2206,40 @@ async def roblox_friends(interaction: discord.Interaction, username: str):
     )
     if friends:
         names = [f"[{f.get('displayName', f['name'])}](https://www.roblox.com/users/{f['id']}/profile)" for f in friends]
-     @bot.tree.command(name="youtube_check", description="Check the status of any YouTube channel by handle")
-    @app_commands.describe(handle="The YouTube handle to check (e.g., @JaxonRoblo or @MrBeast)")
-    async def youtube_check(interaction: discord.Interaction, handle: str):
-        # Let the user know the bot is looking it up (prevents 3-second timeout error)
-        await interaction.response.defer()
+@bot.tree.command(name="youtube_check", description="Check the status of any YouTube channel by handle")
+@app_commands.describe(handle="The YouTube handle to check (e.g., @JaxonRoblo or @MrBeast)")
+async def youtube_check(interaction: discord.Interaction, handle: str):
+    # Let the user know the bot is looking it up (prevents 3-second timeout error)
+    await interaction.response.defer()
+    
+    if not handle.startswith("@"):
+        handle = f"@{handle}"
         
-        if not handle.startswith("@"):
-            handle = f"@{handle}"
+    live_url = f"https://youtube.com{handle}/live"
+    channel_url = f"https://youtube.com{handle}"
+    
+    async with aiohttp.ClientSession(headers=YT_HEADERS) as session:
+        # Resolve the RSS channel ID
+        channel_id = await _resolve_yt_channel_id(session)
+        if not channel_id:
+            return await interaction.followup.send(f"❌ Could not find a YouTube channel matching {handle}. Check your spelling.")
             
-        live_url = f"https://youtube.com{handle}/live"
-        channel_url = f"https://youtube.com{handle}"
+        # Check current live/scheduled status
+        try:
+            async with session.get(live_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                final_url = str(r.url)
+                live_page = await r.text()
+        except Exception as e:
+            return await interaction.followup.send(f"❌ Failed to connect to YouTube: {e}")
+            
+        # Parse the stream status
+        is_upcoming = '"upcomingEventData"' in live_page
+        is_live = "watch?v=" in final_url and not is_upcoming
         
-        async with aiohttp.ClientSession(headers=YT_HEADERS) as session:
-            # Resolve the RSS channel ID
-            channel_id = await _resolve_yt_channel_id(session)
-            if not channel_id:
-                return await interaction.followup.send(f"❌ Could not find a YouTube channel matching {handle}. Check your spelling.")
-                
-            # Check current live/scheduled status
-            try:
-                async with session.get(live_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=10)) as r:
-                    final_url = str(r.url)
-                    live_page = await r.text()
-            except Exception as e:
-                return await interaction.followup.send(f"❌ Failed to connect to YouTube: {e}")
-                
-            # Parse the stream status
-            is_upcoming = '"upcomingEventData"' in live_page
-            is_live = "watch?v=" in final_url and not is_upcoming
-            
-            # Send the status update to the user
-            if is_live:
-                await interaction.followup.send(f"🔴 {handle} is currently **LIVE**! Watch here: {final_url}")
-            elif is_upcoming:
-                await interaction.followup.send(f"📅 {handle} has a **scheduled stream** waiting! Check it here: {final_url}")
-            else:
-                await interaction.followup.send(f"🎬 {handle} is currently offline. Channel link: {channel_url}")
-    @bot.tree.command(name="youtube_check", description="Check the status of any YouTube channel by handle")
-    @app_commands.describe(handle="The YouTube handle to check (e.g., @JaxonRoblo or @MrBeast)")
-    async def youtube_check(interaction: discord.Interaction, handle: str):
-        # Let the user know the bot is looking it up (prevents 3-second timeout error)
-        await interaction.response.defer()
-        
-        if not handle.startswith("@"):
-            handle = f"@{handle}"
-            
-        live_url = f"https://youtube.com{handle}/live"
-        channel_url = f"https://youtube.com{handle}"
-        
-        async with aiohttp.ClientSession(headers=YT_HEADERS) as session:
-            # Resolve the RSS channel ID
-            channel_id = await _resolve_yt_channel_id(session)
-            if not channel_id:
-                return await interaction.followup.send(f"❌ Could not find a YouTube channel matching {handle}. Check your spelling.")
-                
-            # Check current live/scheduled status
-            try:
-                async with session.get(live_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=10)) as r:
-                    final_url = str(r.url)
-                    live_page = await r.text()
-            except Exception as e:
-                return await interaction.followup.send(f"❌ Failed to connect to YouTube: {e}")
-                
-            # Parse the stream status
-            is_upcoming = '"upcomingEventData"' in live_page
-            is_live = "watch?v=" in final_url and not is_upcoming
-            
-            # Send the status update to the user
-            if is_live:
-                await interaction.followup.send(f"🔴 {handle} is currently **LIVE**! Watch here: {final_url}")
-            elif is_upcoming:
-                await interaction.followup.send(f"📅 {handle} has a **scheduled stream** waiting! Check it here: {final_url}")
-            else:
-                await interaction.followup.send(f"🎬 {handle} is currently offline. Channel link: {channel_url}")
+        # Send the status update to the user
+        if is_live:
+            await interaction.followup.send(f"🔴 {handle} is currently **LIVE**! Watch here: {final_url}")
+        elif is_upcoming:
+            await interaction.followup.send(f"📅 {handle} has a **scheduled stream** waiting! Check it here: {final_url}")
+        else:
+            await interaction.followup.send(f"🎬 {handle} is currently offline. Channel link: {channel_url}")
