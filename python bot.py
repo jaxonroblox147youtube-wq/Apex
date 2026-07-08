@@ -70,7 +70,8 @@ YOUTUBE_CHANNEL_PAGE = "https://www.youtube.com/@JaxonRoblo"
 NOTIFY_SERVER_NAME   = "Meteor Run"          # partial match, case-insensitive
 NOTIFY_CHANNEL_KEYWORDS = ["video", "upload"] # channel must contain both words
 
-_yt_was_live      = False
+# Add this line right below your other global variables:
+sent_yt_notifacation = False
 _yt_was_scheduled = False
 _scheduled_msg: discord.Message | None = None   # message to edit when live starts
 _last_video_id    = None   # tracks newest upload from RSS
