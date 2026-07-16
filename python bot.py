@@ -307,7 +307,7 @@ async def check_youtube():
                         _last_video_id = vid_id
                         ch = _find_notify_channel()
                         if ch:
-                            await _send_yt_notification(ch, is_live=False, title=vid_title, url=vid_url)
+                            await _send_yt_notification (ch, vid_title, vid_url)
                         print(f"YouTube: new upload — '{vid_title}'")
 
     except Exception as e:
@@ -2248,3 +2248,7 @@ async def youtube_check(interaction: discord.Interaction, handle: str):
             await interaction.followup.send(f"📅 {handle} has a **scheduled stream** waiting! Check it here: {final_url}")
         else:
             await interaction.followup.send(f"🎬 {handle} is currently offline. Channel link: {channel_url}")
+async def _send_yt_notification(ch, vid_title, vid_url):
+    # This is a starter function to prevent the error.
+    # Replace the print statement below with your actual Discord notification logic.
+    print(f"New video found for channel {ch}: {vid_title} - {vid_url}")
