@@ -1757,51 +1757,6 @@ from flask import Flask, request, jsonify
 import discord
 from discord.ext import commands
 
-# ── 1. CONFIGURE OAUTH CREDENTIALS ──────────────────────────────────────────
-# Replace or pull these from Render environment variables
-ROBLOX_CLIENT_ID     = os.environ.get("ROBLOX_CLIENT_ID", "YOUR_CLIENT_ID")
-ROBLOX_CLIENT_SECRET = os.environ.get("ROBLOX_CLIENT_SECRET", "YOUR_CLIENT_SECRET")
-ROBLOX_REDIRECT_URI  = os.environ.get("ROBLOX_REDIRECT_URI", "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback")
-import os
-
-# This variable automatically grabs Render's port (10000)
-port = int(os.environ.get("PORT", 10000))
-
-# Then you pass that variable into your server start line
-bot.run(host='0.0.0.0', port=port)
-
-# ── 2. FLASK SERVER SETUP (Opens the port for Render/UptimeRobot) ───────────
-app = Flask('')
-
-@app.route('/')
-def home():
-    # Base URL health check for UptimeRobot
-    return "Bot is online and awake! UptimeRobot monitor connected."
-
-@app.route('/oauth/callback')
-def roblox_oauth_callback():
-    """
-    Roblox redirects the user back here with '?code=...' and '?state=...'
-    """
-    code = request.args.get('code')
-    state = request.args.get('state') # This is the Discord User ID you sent
-    
-    if not code:
-        return "Authorization failed or cancelled.", 400
-
-    # Optional placeholder for exchanging the code for an actual token
-    # (This completes the link backend)
-    return f"Success! Verification code received for Discord ID: {state}. You can close this tab."
-
-def run_web_server():
-    # Pulls the port automatically assigned by Render
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
-
-# START THE PORT COMPONENT IN THE BACKGROUND BEFORE THE BOT SITS ON A LOOP
-Thread(target=run_web_server).start()
-
-
 import os
 import urllib.parse
 from threading import Thread
@@ -1815,7 +1770,7 @@ ROBLOX_CLIENT_SECRET = os.environ.get("ROBLOX_CLIENT_SECRET", "YOUR_CLIENT_SECRE
 # Your explicit Replit callback link
 ROBLOX_REDIRECT_URI  = "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback"
 
-# ── 2. FLASK SERVER SYSTEM ──────────────────────────────────────────────────
+# ── 2. FLASK SERVER SYSTEM (Opens the port cleanly for Render) ──────────────
 app = Flask('')
 
 @app.route('/')
@@ -1836,13 +1791,12 @@ def roblox_oauth_callback():
     state = request.args.get('state') # The Discord User ID string
     
     if code:
-        # Put your token exchange logic here
         return f"Success! Verification code caught for Discord ID: {state}. You can close this tab.", 200
         
     return "Callback endpoint active, missing auth code.", 400
 
 def run_web_server():
-    # Render requires binding to port 10000 or reading the env port variable
+    # Grabs Render's automatic port (10000) and binds it safely
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
@@ -1888,7 +1842,9 @@ async def roblox_link(interaction: discord.Interaction):
 
 # ── 4. LAUNCH CONTROL ──────────────────────────────────────────────────────
 if __name__ == "__main__":
+    # Your discord bot logs in safely down here using only your token
     bot.run(os.environ.get('DISCORD_TOKEN'))
+
 
 
 # ── /robloxunlink — remove linked Roblox account ─────────────────────────────
