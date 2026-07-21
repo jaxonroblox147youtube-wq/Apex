@@ -2252,3 +2252,20 @@ async def _send_yt_notification(ch, vid_title, vid_url):
     # This is a starter function to prevent the error.
     # Replace the print statement below with your actual Discord notification logic.
     print(f"New video found for channel {ch}: {vid_title} - {vid_url}")
+from flask import Flask
+from threading import Thread
+import os
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is online and awake!"
+
+def run():
+    # Render automatically passes the correct port via environment variables
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# This starts the web server in a separate background thread so it doesn't block your bot
+Thread(target=run).start()
