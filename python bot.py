@@ -2260,12 +2260,16 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is online and awake!"
+    return "Bot is online!"
 
 def run():
-    # Render automatically passes the correct port via environment variables
+    # Render assigns a dynamic port here automatically
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
-# This starts the web server in a separate background thread so it doesn't block your bot
+# 1. THIS MUST RUN FIRST: Opens the port in the background
 Thread(target=run).start()
+
+# 2. THIS MUST RUN LAST: Starts your bot code
+# (Replace 'client.run' with your actual bot/client start variable)
+bot.run(os.environ.get('DISCORD_TOKEN'))
