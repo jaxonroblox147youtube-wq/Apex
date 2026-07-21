@@ -2,3 +2,5 @@ discord.py
 quart
 hypercorn
 aiohttp
+flask
+discord.py
