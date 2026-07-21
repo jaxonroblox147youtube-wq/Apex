@@ -1761,7 +1761,7 @@ from discord.ext import commands
 # Replace or pull these from Render environment variables
 ROBLOX_CLIENT_ID     = os.environ.get("ROBLOX_CLIENT_ID", "YOUR_CLIENT_ID")
 ROBLOX_CLIENT_SECRET = os.environ.get("ROBLOX_CLIENT_SECRET", "YOUR_CLIENT_SECRET")
-ROBLOX_REDIRECT_URI  = os.environ.get("ROBLOX_REDIRECT_URI", "https://onrender.com")
+ROBLOX_REDIRECT_URI  = os.environ.get("ROBLOX_REDIRECT_URI", "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback")
 
 # ── 2. FLASK SERVER SETUP (Opens the port for Render/UptimeRobot) ───────────
 app = Flask('')
