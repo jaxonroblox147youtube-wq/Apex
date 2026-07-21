@@ -1795,8 +1795,55 @@ def run_web_server():
 Thread(target=run_web_server).start()
 
 
-# ── 3. DISCORD BOT COMMAND SETUP ────────────────────────────────────────────
-# Ensure your intents match whatever your bot uses
+import os
+import urllib.parse
+from threading import Thread
+from flask import Flask, request
+import discord
+from discord.ext import commands
+
+# ── 1. EXACT REPLIT OAUTH ROUTING ──────────────────────────────────────────
+ROBLOX_CLIENT_ID     = os.environ.get("ROBLOX_CLIENT_ID", "YOUR_CLIENT_ID")
+ROBLOX_CLIENT_SECRET = os.environ.get("ROBLOX_CLIENT_SECRET", "YOUR_CLIENT_SECRET")
+# Your explicit Replit callback link
+ROBLOX_REDIRECT_URI  = "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback"
+
+# ── 2. FLASK SERVER SYSTEM ──────────────────────────────────────────────────
+app = Flask('')
+
+@app.route('/')
+def home():
+    """
+    This endpoint exists purely to satisfy Render's port scanner 
+    and to answer your UptimeRobot 5-minute pings.
+    """
+    return "Render Port Scanner & UptimeRobot Active!", 200
+
+@app.route('/api/roblox/callback')
+def roblox_oauth_callback():
+    """
+    This is your actual active script callback path. 
+    It catches the verification data when someone runs /roblink.
+    """
+    code = request.args.get('code')
+    state = request.args.get('state') # The Discord User ID string
+    
+    if code:
+        # Put your token exchange logic here
+        return f"Success! Verification code caught for Discord ID: {state}. You can close this tab.", 200
+        
+    return "Callback endpoint active, missing auth code.", 400
+
+def run_web_server():
+    # Render requires binding to port 10000 or reading the env port variable
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+# START THE DUAL-ROUTED PORT IN THE BACKGROUND FIRST
+Thread(target=run_web_server).start()
+
+
+# ── 3. DISCORD BOT COMMAND ─────────────────────────────────────────────────
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -1813,29 +1860,29 @@ async def roblox_link(interaction: discord.Interaction):
     scopes  = "openid profile"
     params  = urllib.parse.urlencode({
         "client_id":     ROBLOX_CLIENT_ID,
-        "redirect_uri":  ROBLOX_REDIRECT_URI,
+        "redirect_uri":  ROBLOX_REDIRECT_URI, # Exact path match
         "scope":         scopes,
         "response_type": "code",
         "state":         state,
     })
-    auth_url = f"https://apis.roblox.com/oauth/v1/authorize?{params}"
+    auth_url = f"https://roblox.com?{params}"
     
     embed = discord.Embed(
         title="🔗 Link Your Roblox Account",
         description=(
             f"Click the button below to authorize the bot to access your Roblox account.\n\n"
             f"[**Authorize on Roblox →**]({auth_url})\n\n"
-            f"Once you approve, your account will be linked and you can use `/robloxme`, "
-            f"`/robloxannounce`, and `/robloxrole`."
+            f"Once you approve, your account will be linked."
         ),
         color=discord.Color.from_rgb(226, 35, 26),
     )
     embed.set_footer(text="Your Roblox credentials are never stored — only the OAuth token.")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# ── 4. RUN THE BOT ─────────────────────────────────────────────────────────
+# ── 4. LAUNCH CONTROL ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     bot.run(os.environ.get('DISCORD_TOKEN'))
+
 
 # ── /robloxunlink — remove linked Roblox account ─────────────────────────────
 @bot.tree.command(name="robloxunlink", description="Unlink your Roblox account from this bot")
