@@ -1768,7 +1768,8 @@ from discord.ext import commands
 ROBLOX_CLIENT_ID     = os.environ.get("ROBLOX_CLIENT_ID", "YOUR_CLIENT_ID")
 ROBLOX_CLIENT_SECRET = os.environ.get("ROBLOX_CLIENT_SECRET", "YOUR_CLIENT_SECRET")
 # Your explicit Replit callback link
-ROBLOX_REDIRECT_URI  = "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback"
+# Change this line so it targets your live Render link
+ROBLOX_REDIRECT_URI  = "https://onrender.com"
 
 # ── 2. FLASK SERVER SYSTEM (Opens the port cleanly for Render) ──────────────
 app = Flask('')
