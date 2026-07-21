@@ -1762,6 +1762,13 @@ from discord.ext import commands
 ROBLOX_CLIENT_ID     = os.environ.get("ROBLOX_CLIENT_ID", "YOUR_CLIENT_ID")
 ROBLOX_CLIENT_SECRET = os.environ.get("ROBLOX_CLIENT_SECRET", "YOUR_CLIENT_SECRET")
 ROBLOX_REDIRECT_URI  = os.environ.get("ROBLOX_REDIRECT_URI", "https://discord-bot-script--jaxonmarshall98.replit.app/api/roblox/callback")
+import os
+
+# This variable automatically grabs Render's port (10000)
+port = int(os.environ.get("PORT", 10000))
+
+# Then you pass that variable into your server start line
+bot.run(host='0.0.0.0', port=port)
 
 # ── 2. FLASK SERVER SETUP (Opens the port for Render/UptimeRobot) ───────────
 app = Flask('')
