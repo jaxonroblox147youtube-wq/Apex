@@ -405,9 +405,12 @@ async def check_youtube():
                         _last_video_id = vid_id
                         ch = _find_notify_channel()
                         if ch:
-                            await _send_yt_notification(ch, is_live=False, title=vid_title, url=vid_url)
+                            async def send_yt_notification(channel, is_live=False, title="New Video", url=""):
+                                kind = "live" if is_live else "upload"
+                                content, embed = _make_embed(kind=kind, title=title, url=url)
+                                await channel.send(content, embed=embed, allowed_mentions=discord.AllowedMentions(everyone=True))
+                            await send_yt_notification(ch, is_live=False, title=vid_title, url=vid_url)
                         print(f"YouTube: new upload — '{vid_title}'")
-
     except Exception as e:
         print(f"YouTube check error: {e}")
 
@@ -2855,4 +2858,4 @@ async def robloxprofile(interaction: discord.Interaction, member: discord.Member
     await interaction.followup.send(embed=embed)
 
 # End of bot script.
-# end
+# nd
