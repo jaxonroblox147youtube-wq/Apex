@@ -2974,7 +2974,7 @@ class TicketPanelView(discord.ui.View):
             )
 
         # Load staff role setting
-        settings = load_json
+        settings = load_json()
         guild_cfg = settings.get(str(guild.id), {})
         role_id = guild_cfg.get("role_id")
         staff_role = guild.get_role(int(role_id)) if role_id else None
@@ -3035,6 +3035,8 @@ class TicketPanelView(discord.ui.View):
         await self._open_ticket(interaction, "Bug Fix", "🐛")
 
     @discord.ui.button(label="🚨 Emergency Help", style=discord.ButtonStyle.red, custom_id="ticket_emergency")
+    async def emergency_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_ticket(interaction, "Emergency Help", "🚨")
     async def emergency_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._open_ticket(interaction, "Emergency Help", "🚨")
 
