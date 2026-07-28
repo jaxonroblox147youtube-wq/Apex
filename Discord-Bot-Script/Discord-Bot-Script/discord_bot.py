@@ -587,6 +587,7 @@ _DEPLOY_RULES = [
 @app_commands.checks.has_permissions(manage_guild=True)
 async def deploy_rules(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
     if not guild:
         await interaction.followup.send("❌ Must be used inside a server.", ephemeral=True)
