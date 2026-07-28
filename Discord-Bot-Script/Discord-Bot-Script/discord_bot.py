@@ -420,11 +420,7 @@ async def before_yt_check():
 
 @bot.event
 async def on_ready():
-    bot.add_view(TicketPanelView())
-    bot.add_view(TicketChannelView())
     # Make ticket buttons work even after the bot restarts
-    bot.add_view(TicketPanelView())
-    bot.add_view(TicketChannelView())
     global BOT_START_TIME
     BOT_START_TIME = datetime.datetime.utcnow()
     await bot.change_presence(
@@ -3079,3 +3075,12 @@ async def ticket_setup(interaction: discord.Interaction, channel: discord.TextCh
         f"Staff role: {role.mention} — they can see all ticket channels.",
         ephemeral=True,
     )
+
+# Register persistent views after everything is defined
+@bot.listen()
+async def on_ready():
+    try:
+        bot.add_view(TicketPanelView())
+        bot.add_view(TicketChannelView())
+    except Exception:
+        pass
