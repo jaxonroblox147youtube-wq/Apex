@@ -587,7 +587,6 @@ _DEPLOY_RULES = [
 @app_commands.checks.has_permissions(manage_guild=True)
 async def deploy_rules(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
-    await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
     if not guild:
         await interaction.followup.send("❌ Must be used inside a server.", ephemeral=True)
@@ -916,7 +915,6 @@ async def unban(interaction: discord.Interaction, user_id: str):
 @bot.tree.command(name="banlist", description="Show all banned users (owner only)")
 @app_commands.check(is_owner)
 async def banlist(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
     bans = [entry async for entry in interaction.guild.bans()]
     if not bans:
         return await interaction.followup.send("✅ No banned users.", ephemeral=True)
@@ -948,7 +946,6 @@ async def untimeout(interaction: discord.Interaction, member: discord.Member):
 async def clear(interaction: discord.Interaction, amount: int = 10):
     if amount < 1 or amount > 100:
         return await interaction.response.send_message("❌ Amount must be 1–100.", ephemeral=True)
-    await interaction.response.defer(ephemeral=True)
     deleted = await interaction.channel.purge(limit=amount)
     await interaction.followup.send(f"🧹 Deleted {len(deleted)} message(s).", ephemeral=True)
 
@@ -1884,7 +1881,6 @@ async def roblox_link(interaction: discord.Interaction):
 # ── /robloxunlink — remove linked Roblox account ─────────────────────────────
 @bot.tree.command(name="robloxunlink", description="Unlink your Roblox account from this bot")
 async def roblox_unlink(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
     try:
         async with aiohttp.ClientSession() as s:
             async with s.delete(
@@ -1902,7 +1898,6 @@ async def roblox_unlink(interaction: discord.Interaction):
 # ── /robloxme — show your linked profile ─────────────────────────────────────
 @bot.tree.command(name="robloxme", description="Show your linked Roblox profile")
 async def roblox_me(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
     token = await _load_roblox_token(interaction.user.id)
     if not token:
         await interaction.followup.send(
@@ -1935,7 +1930,6 @@ async def roblox_me(interaction: discord.Interaction):
 @app_commands.describe(message="The announcement message to post")
 @app_commands.check(is_owner)
 async def roblox_announce(interaction: discord.Interaction, message: str):
-    await interaction.response.defer(ephemeral=True)
     token = await _load_roblox_token(interaction.user.id)
     if not token:
         await interaction.followup.send("❌ Link your Roblox account first with `/robloxlink`.", ephemeral=True)
@@ -1963,7 +1957,6 @@ async def roblox_announce(interaction: discord.Interaction, message: str):
 @app_commands.describe(username="Roblox username of the target user", rolename="Exact name of the group role to assign")
 @app_commands.check(is_owner)
 async def roblox_role(interaction: discord.Interaction, username: str, rolename: str):
-    await interaction.response.defer(ephemeral=True)
     token = await _load_roblox_token(interaction.user.id)
     if not token:
         await interaction.followup.send("❌ Link your Roblox account first with `/robloxlink`.", ephemeral=True)
