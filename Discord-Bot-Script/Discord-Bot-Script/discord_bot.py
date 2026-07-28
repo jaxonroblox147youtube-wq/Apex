@@ -420,6 +420,11 @@ async def before_yt_check():
 
 @bot.event
 async def on_ready():
+    bot.add_view(TicketPanelView())
+    bot.add_view(TicketChannelView())
+    # Make ticket buttons work even after the bot restarts
+    bot.add_view(TicketPanelView())
+    bot.add_view(TicketChannelView())
     global BOT_START_TIME
     BOT_START_TIME = datetime.datetime.utcnow()
     await bot.change_presence(
