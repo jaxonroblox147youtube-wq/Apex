@@ -2851,5 +2851,224 @@ async def robloxprofile(interaction: discord.Interaction, member: discord.Member
 
     await interaction.followup.send(embed=embed)
 
-# End of bot script.
-# nd
+# ══════════════════════════════════════════════════════════════════════════════
+# TICKET SYSTEM
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def get_ai_response(question: str) -> str:
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        return (
+            f"Thanks for reaching out!\n\n"
+            f"Regarding your question: *\"{question}\"*\n\n"
+            "A staff member has been notified and will assist you shortly. "
+            "Please hang tight! 🙏"
+        )
+    try:
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-1.5-flash:generateContent?key={api_key}"
+        )
+        payload = {
+            "system_instruction": {
+                "parts": [{"text": (
+                    "You are Apex, a helpful Discord support bot. "
+                    "Give clear, concise, friendly answers to support ticket questions. "
+                    "Keep responses under 300 words."
+                )}]
+            },
+            "contents": [{"parts": [{"text": question}]}],
+            "generationConfig": {"maxOutputTokens": 400},
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                return "I'm having trouble connecting right now. A staff member will assist you shortly!"
+    except Exception:
+        return "I'm having trouble connecting right now. A staff member will assist you shortly!"
+
+
+class AIResponseModal(discord.ui.Modal, title="AI Help Request"):
+    question = discord.ui.TextInput(
+        label="What do you want the AI to help with?",
+        style=discord.TextStyle.paragraph,
+        placeholder="Describe your issue in detail...",
+        required=True,
+        max_length=1000,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        async with interaction.channel.typing():
+            response = await get_ai_response(self.question.value)
+        embed = discord.Embed(
+            title="🤖 Apex AI Response",
+            description=response,
+            color=discord.Color.blurple(),
+            timestamp=datetime.datetime.utcnow(),
+        )
+        embed.set_footer(text="AI-generated response • Apex Bot")
+        await interaction.followup.send(embed=embed)
+
+
+class TicketChannelView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="✋ Claim", style=discord.ButtonStyle.green, custom_id="ticket_claim")
+    async def claim_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Ticket opener ID is stored in channel topic
+        opener_id = None
+        if interaction.channel.topic:
+            try:
+                opener_id = int(interaction.channel.topic.split("opener:")[1].split()[0])
+            except Exception:
+                pass
+        opener_mention = f"<@{opener_id}>" if opener_id else "the ticket opener"
+        embed = discord.Embed(
+            description=f"{interaction.user.mention} will handle your ticket, {opener_mention}! 🎉",
+            color=discord.Color.green(),
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @discord.ui.button(label="🔒 Close Ticket", style=discord.ButtonStyle.red, custom_id="ticket_close")
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🔒 Closing ticket in 3 seconds...", ephemeral=True)
+        await asyncio.sleep(3)
+        channel = interaction.channel
+        category = channel.category
+        await channel.delete(reason=f"Ticket closed by {interaction.user}")
+        if category and len(category.channels) == 0:
+            try:
+                await category.delete(reason="Tickets category is now empty")
+            except Exception:
+                pass
+
+    @discord.ui.button(label="🤖 AI Response", style=discord.ButtonStyle.blurple, custom_id="ticket_ai_response")
+    async def ai_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(AIResponseModal())
+
+
+class TicketPanelView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def _open_ticket(self, interaction: discord.Interaction, reason: str, emoji: str):
+        await interaction.response.defer(ephemeral=True)
+        guild = interaction.guild
+        member = interaction.user
+
+        # Prevent duplicate tickets
+        safe_name = member.name.lower().replace(" ", "-")[:20]
+        ticket_name = f"{safe_name}-ticket"
+        existing = discord.utils.get(guild.text_channels, name=ticket_name)
+        if existing:
+            return await interaction.followup.send(
+                f"❌ You already have an open ticket: {existing.mention}", ephemeral=True
+            )
+
+        # Load staff role setting
+        settings = load_json
+        guild_cfg = settings.get(str(guild.id), {})
+        role_id = guild_cfg.get("role_id")
+        staff_role = guild.get_role(int(role_id)) if role_id else None
+
+        # Get or create the Tickets category
+        category = discord.utils.get(guild.categories, name="Tickets")
+        if not category:
+            category = await guild.create_category("Tickets")
+
+        # Permissions — private to opener + staff role + bot
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            member: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_channels=True),
+        }
+        if staff_role:
+            overwrites[staff_role] = discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, read_message_history=True
+            )
+
+        channel = await category.create_text_channel(
+            name=ticket_name,
+            overwrites=overwrites,
+            topic=f"opener:{member.id} reason:{reason}",
+        )
+
+        # Build ticket embed
+        embed = discord.Embed(
+            title=f"{emoji} {reason} Ticket",
+            description=(
+                f"Welcome {member.mention}!\n\n"
+                f"**Reason:** {reason}\n\n"
+                "A staff member will be with you shortly.\n"
+                "Use the buttons below to manage this ticket."
+            ),
+            color=discord.Color.blurple(),
+            timestamp=datetime.datetime.utcnow(),
+        )
+        embed.set_footer(text=f"Opened by {member.display_name}")
+
+        ai_hint = discord.Embed(
+            description="⏰ **Taking too long?** Click **🤖 AI Response** below for instant help!",
+            color=discord.Color.gold(),
+        )
+
+        view = TicketChannelView()
+        await channel.send(content=member.mention, embeds=[embed, ai_hint], view=view)
+        await interaction.followup.send(
+            f"✅ Your ticket has been created: {channel.mention}", ephemeral=True
+        )
+
+    @discord.ui.button(label="🎉 Giveaway Claim", style=discord.ButtonStyle.green, custom_id="ticket_giveaway")
+    async def giveaway_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_ticket(interaction, "Giveaway Claim", "🎉")
+
+    @discord.ui.button(label="🐛 Bug Fix", style=discord.ButtonStyle.blurple, custom_id="ticket_bug")
+    async def bug_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_ticket(interaction, "Bug Fix", "🐛")
+
+    @discord.ui.button(label="🚨 Emergency Help", style=discord.ButtonStyle.red, custom_id="ticket_emergency")
+    async def emergency_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._open_ticket(interaction, "Emergency Help", "🚨")
+
+
+@bot.tree.command(name="ticket-setup", description="Send a ticket panel to a channel")
+@app_commands.describe(
+    channel="Channel to post the ticket panel in",
+    role="Role that can see and manage all tickets",
+)
+@app_commands.checks.has_permissions(manage_guild=True)
+async def ticket_setup(interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role):
+    await interaction.response.defer(ephemeral=True)
+
+    # Save guild settings
+    settings = load_json()
+    settings[str(interaction.guild.id)] = {"role_id": role.id, "panel_channel_id": channel.id}
+    save_json(settings)
+
+    embed = discord.Embed(
+        title="🎫 Make A Ticket Here",
+        description=(
+            "**Select your reason below to open a support ticket.**\n\n"
+            "🎉 **Giveaway Claim** — Claim a giveaway prize\n"
+            "🐛 **Bug Fix** — Report a bug or issue\n"
+            "🚨 **Emergency Help** — Urgent assistance needed\n\n"
+            "*A dedicated private channel will be created just for you.*"
+        ),
+        color=discord.Color.blurple(),
+    )
+    embed.set_footer(text="Apex Ticket System • Powered by Apex Bot")
+
+    await channel.send(embed=embed, view=TicketPanelView())
+    await interaction.followup.send(
+        f"✅ Ticket panel sent to {channel.mention}!\n"
+        f"Staff role: {role.mention} — they can see all ticket channels.",
+        ephemeral=True,
+    )
